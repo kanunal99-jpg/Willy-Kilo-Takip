@@ -6,17 +6,27 @@ const foodPath = 'src/components/AddFoodModal.tsx';
 let food = fs.readFileSync(foodPath, 'utf8');
 
 if (!food.includes('const WILLY_API_BASE')) {
-  const marker = "export const AddFoodModal";
+  const marker = 'export const AddFoodModal';
+  if (!food.includes(marker)) throw new Error('AddFoodModal export marker not found; refusing unsafe patch');
   food = food.replace(
     marker,
     `const WILLY_API_BASE = import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? '${API_BASE}' : '');\n\n${marker}`
   );
 }
 
-food = food.replace(
-  "const res = await fetch('/api/ai/analyze-food', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imageBase64: imagePreview, description: aiPromptNote, mealType: targetMeal }) });",
-  "const mimeType = imagePreview?.match(/^data:([^;]+);base64,/)?.[1] || 'image/jpeg';\n      const res = await fetch(`${WILLY_API_BASE}/api/ai/analyze-food`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, body: JSON.stringify({ imageBase64: imagePreview, mimeType, description: aiPromptNote, mealType: targetMeal }) });"
-);
+const aiFetchPattern = /const res = await fetch\(\s*['\"]\/api\/ai\/analyze-food['\"]\s*,\s*\{[\s\S]*?\}\);/m;
+const aiFetchReplacement = `const mimeType = imagePreview?.match(/^data:([^;]+);base64,/)?.[1] || 'image/jpeg';
+      const res = await fetch(\`${WILLY_API_BASE}/api/ai/analyze-food\`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ imageBase64: imagePreview, mimeType, description: aiPromptNote, mealType: targetMeal })
+      });`;
+
+if (aiFetchPattern.test(food)) {
+  food = food.replace(aiFetchPattern, aiFetchReplacement);
+} else if (!food.includes("fetch(`${WILLY_API_BASE}/api/ai/analyze-food`")) {
+  throw new Error('AI food fetch target not found; refusing unsafe patch');
+}
 
 fs.writeFileSync(foodPath, food);
 
