@@ -78,7 +78,7 @@ jobs:
           p = Path('app/build.gradle')
           s = p.read_text()
 
-          signing = '''\n    signingConfigs {\n        release {\n            storeFile file("../willy-release.jks")\n            storePassword System.getenv("KEYSTORE_PASSWORD")\n            keyAlias System.getenv("KEY_ALIAS")\n            keyPassword System.getenv("KEY_PASSWORD")\n        }\n    }\n'''
+          signing = '''\n    signingConfigs {\n        release {\n            storeFile file("../willy-release.jks")\n            storeType "PKCS12"\n            storePassword System.getenv("KEYSTORE_PASSWORD")\n            keyAlias System.getenv("KEY_ALIAS")\n            keyPassword System.getenv("KEY_PASSWORD")\n        }\n    }\n'''
 
           if 'signingConfigs {' not in s:
               s = s.replace('android {', 'android {' + signing, 1)
