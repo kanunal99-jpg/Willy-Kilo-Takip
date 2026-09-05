@@ -68,8 +68,16 @@ jobs:
         env:
           KEYSTORE_B64: ${{ secrets.WILLY_RELEASE_KEYSTORE_BASE64 }}
         run: |
-          CLEAN_B64=$(printf '%s' "$KEYSTORE_B64" | tr -d '[:space:]')
+          CLEAN_B64=$(printf '%s' "$KEYSTORE_B64" | tr -cd 'A-Za-z0-9+/=')
+          REM=$(( ${#CLEAN_B64} % 4 ))
+          if [ "$REM" -ne 0 ]; then
+            CLEAN_B64="${CLEAN_B64}$(printf '=%.0s' $(seq 1 $((4 - REM))))"
+          fi
           printf '%s' "$CLEAN_B64" | base64 --decode > willy-release.jks
+          test -s willy-release.jks || { echo "ERROR: decoded keystore is empty"; exit 1; }
+          openssl pkcs12 -in willy-release.jks -passin env:KEYSTORE_PASSWORD -noout >/dev/null 2>&1 || {
+            echo "ERROR: decoded keystore is not a valid PKCS12 keystore or the password is incorrect."; exit 1;
+          }
           python3 - <<'PY'
           from pathlib import Path
           import re
