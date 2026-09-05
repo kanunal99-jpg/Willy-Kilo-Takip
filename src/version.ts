@@ -9,16 +9,16 @@ export interface AppVersionInfo {
 }
 
 export const APP_VERSION: AppVersionInfo = {
-  versionName: '1.0.3',
-  versionCode: 4,
+  versionName: '1.0.4',
+  versionCode: 5,
   releaseDate: '2026-09-05',
-  minSupportedVersion: '1.0.2',
+  minSupportedVersion: '1.0.3',
   apkUrl: 'https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest/download/WillyKiloTakip.apk',
   githubReleaseUrl: 'https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest',
   releaseNotes: [
-    'Willy AI Koç artık gerçek Gemini yanıtını kullanıyor',
-    'Kullanıcı sorusuna göre kişiselleştirilmiş cevap üretimi düzeltildi',
-    'Sabit/fake AI fallback kaldırıldı; gerçek AI hataları görünür hale getirildi',
-    'Gemini model uyumluluğu için güncel üretim modelleriyle otomatik fallback eklendi',
+    'Android native Willy AI is now routed to the live Render backend',
+    'Gerçek Gemini AI Koçu native APK içinde aktif',
+    'Sabit/fake AI yanıtı yerine production Gemini yanıtı kullanılıyor',
+    'Kalıcı release imzası ile OTA güncelleme zinciri korunuyor',
   ],
 };
