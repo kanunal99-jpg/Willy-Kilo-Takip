@@ -8,5 +8,173 @@
     "fastingHistory": [],
     "weightRecords": [],
     "customRecipes": []
+  },
+  "WILLY-823902": {
+    "lastUpdated": 1788615120582,
+    "profile": {
+      "id": "willy-user-default",
+      "name": "Willy Dostu",
+      "gender": "female",
+      "age": 28,
+      "heightCm": 168,
+      "currentWeightKg": 68.5,
+      "startingWeightKg": 75,
+      "targetWeightKg": 60,
+      "goal": "lose_weight",
+      "activityLevel": "moderate",
+      "dailyCalorieTarget": 1650,
+      "macroTargets": {
+        "carbs": 165,
+        "protein": 105,
+        "fat": 55
+      },
+      "waterTargetMl": 2250,
+      "fastingPlan": "16:8",
+      "cloudSyncKey": "WILLY-823902",
+      "diamonds": 2450,
+      "streakDays": 14
+    },
+    "dailyLogs": {
+      "2026-09-05": {
+        "date": "2026-09-05",
+        "entries": [
+          {
+            "id": "init-1",
+            "name": "Haşlanmış Yumurta (2 Adet)",
+            "mealType": "breakfast",
+            "servingAmount": 2,
+            "servingUnit": "adet",
+            "calories": 156,
+            "carbs": 1.2,
+            "protein": 12.6,
+            "fat": 10.6,
+            "fiber": 0,
+            "healthScore": 95,
+            "pros": [
+              "İyi protein kaynağı",
+              "Sıfır şeker"
+            ],
+            "timestamp": 1788593512676
+          },
+          {
+            "id": "init-2",
+            "name": "Beyaz Peynir & Yeşillik",
+            "mealType": "breakfast",
+            "servingAmount": 40,
+            "servingUnit": "gram",
+            "calories": 124,
+            "carbs": 1.5,
+            "protein": 8.5,
+            "fat": 9.6,
+            "fiber": 1.2,
+            "healthScore": 88,
+            "pros": [
+              "Kalsiyum deposu"
+            ],
+            "timestamp": 1788593872676
+          },
+          {
+            "id": "init-3",
+            "name": "Izgara Tavuklu Kinoa Salatası",
+            "mealType": "lunch",
+            "servingAmount": 1,
+            "servingUnit": "porsiyon",
+            "calories": 460,
+            "carbs": 38,
+            "protein": 42,
+            "fat": 14,
+            "fiber": 6.5,
+            "healthScore": 98,
+            "pros": [
+              "Yüksek protein",
+              "Kompleks karbonhidrat"
+            ],
+            "timestamp": 1788604312676
+          }
+        ],
+        "waterIntakeMl": 1750,
+        "steps": 6420,
+        "exercises": [
+          {
+            "id": "ex-1",
+            "title": "Tempolu Yürüyüş",
+            "durationMinutes": 35,
+            "caloriesBurned": 185,
+            "steps": 4200,
+            "timestamp": 1788600712676
+          }
+        ],
+        "notes": "Enerjim bugün çok yüksekti!"
+      }
+    },
+    "fastingHistory": [
+      {
+        "id": "fh-1",
+        "plan": "16:8",
+        "startTime": 1788291112676,
+        "endTime": 1788348712676,
+        "targetDurationHours": 16,
+        "completed": true
+      },
+      {
+        "id": "fh-2",
+        "plan": "16:8",
+        "startTime": 1788375712676,
+        "endTime": 1788435112676,
+        "targetDurationHours": 16,
+        "completed": true
+      },
+      {
+        "id": "fh-3",
+        "plan": "16:8",
+        "startTime": 1788463912676,
+        "endTime": 1788521512676,
+        "targetDurationHours": 16,
+        "completed": true
+      }
+    ],
+    "weightRecords": [
+      {
+        "id": "w-1",
+        "date": "14 Gün Önce",
+        "weightKg": 72,
+        "bodyFat": 26.5,
+        "waistCm": 82,
+        "timestamp": 1787398312676
+      },
+      {
+        "id": "w-2",
+        "date": "10 Gün Önce",
+        "weightKg": 71.2,
+        "bodyFat": 26,
+        "waistCm": 81,
+        "timestamp": 1787743912676
+      },
+      {
+        "id": "w-3",
+        "date": "7 Gün Önce",
+        "weightKg": 70.4,
+        "bodyFat": 25.4,
+        "waistCm": 80,
+        "timestamp": 1788003112676
+      },
+      {
+        "id": "w-4",
+        "date": "3 Gün Önce",
+        "weightKg": 69.3,
+        "bodyFat": 24.8,
+        "waistCm": 79,
+        "timestamp": 1788348712676
+      },
+      {
+        "id": "w-5",
+        "date": "Bugün",
+        "weightKg": 68.5,
+        "bodyFat": 24.2,
+        "waistCm": 78,
+        "timestamp": 1788607912676
+      }
+    ],
+    "customRecipes": []
   }
 }

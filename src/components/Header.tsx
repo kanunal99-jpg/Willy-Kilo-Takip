@@ -12,6 +12,8 @@ interface HeaderProps {
   onOpenSyncModal: () => void;
   onOpenProfileModal: () => void;
   onOpenApkModal: () => void;
+  onOpenUpdateModal?: () => void;
+  hasAvailableUpdate?: boolean;
   isSyncing?: boolean;
 }
 
@@ -24,6 +26,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSyncModal,
   onOpenProfileModal,
   onOpenApkModal,
+  onOpenUpdateModal,
+  hasAvailableUpdate,
   isSyncing,
 }) => {
   return (
@@ -76,6 +80,24 @@ export const Header: React.FC<HeaderProps> = ({
             <Cloud className={`w-4 h-4 text-cyan-400 ${isSyncing ? 'animate-spin' : ''}`} />
             <span className="hidden sm:inline">Bulut</span>
           </button>
+
+          {/* OTA Software Update button */}
+          {onOpenUpdateModal && (
+            <button
+              onClick={onOpenUpdateModal}
+              id="btn-header-update-check"
+              className="relative p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-emerald-400 transition cursor-pointer"
+              title="Güncellemeleri Kontrol Et"
+            >
+              <RefreshCw className="w-4 h-4" />
+              {hasAvailableUpdate && (
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 border-2 border-slate-950"></span>
+                </span>
+              )}
+            </button>
+          )}
 
           {/* APK Export & Install button */}
           <button

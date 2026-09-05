@@ -1,4 +1,4 @@
-name: Android APK
+name: Android APK & GitHub Release
 
 on:
   push:
@@ -6,10 +6,10 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-apk:
+  build-and-release:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,6 +28,19 @@ jobs:
       - name: Add Android platform
         run: npx cap add android
 
+      - name: Extract version info
+        id: version
+        run: |
+          VERSION=$(node -p "require('./version.json').versionName || '1.0.1'")
+          CODE=$(node -p "require('./version.json').versionCode || 2")
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "CODE=$CODE" >> $GITHUB_OUTPUT
+          echo "Building Willy Kilo Takip version $VERSION (code: $CODE)"
+          if [ -f "android/app/build.gradle" ]; then
+            sed -i "s/versionCode [0-9]\+/versionCode $CODE/" android/app/build.gradle
+            sed -i "s/versionName \"[^\"]*\"/versionName \"$VERSION\"/" android/app/build.gradle
+          fi
+
       - name: Sync Capacitor
         run: npx cap sync android
 
@@ -41,9 +54,39 @@ jobs:
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
 
-      - name: Upload APK
+      - name: Prepare APK outputs
+        run: |
+          mkdir -p release-assets
+          cp android/app/build/outputs/apk/debug/app-debug.apk release-assets/WillyKiloTakip.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk release-assets/WillyKiloTakip-v${{ steps.version.outputs.VERSION }}.apk
+
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: willy-kilo-takip-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: release-assets/WillyKiloTakip.apk
           if-no-files-found: error
+
+      - name: Create or Update GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: v${{ steps.version.outputs.VERSION }}
+          name: Willy Kilo Takip v${{ steps.version.outputs.VERSION }}
+          body: |
+            ## 🐾 Willy Kilo Takip v${{ steps.version.outputs.VERSION }}
+            
+            ### ✨ Yenilikler ve Güncellemeler:
+            - 🤖 **Gerçek Gemini AI Willy Koç & Yemek Analizi**: Beslenme tavsiyeleri ve fotoğraflı makro analizi
+            - 🔄 **Canlı OTA Güncelleme Sistemi**: Uygulama içinden tek tıkla güncelleme kontrolü ve APK indirme
+            - 📱 **PWA & Offline-First**: İnternet olmadan da kesintisiz veri kaydı ve yerel hafıza güvenliği
+            - ⚡ **Performans İyileştirmeleri**: Hızlı açılış ve akıcı animasyonlar
+            
+            **İndirme:** Aşağıdaki `WillyKiloTakip.apk` dosyasını Android cihazınıza indirip doğrudan kurabilirsiniz.
+          files: |
+            release-assets/WillyKiloTakip.apk
+            release-assets/WillyKiloTakip-v${{ steps.version.outputs.VERSION }}.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

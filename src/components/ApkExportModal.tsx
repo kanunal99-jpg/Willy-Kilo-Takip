@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { Download, Smartphone, Globe, ExternalLink, QrCode, Check, Copy, Package, ShieldCheck, X, Terminal, FileCode2, Play } from 'lucide-react';
+import { Download, Smartphone, Globe, ExternalLink, QrCode, Check, Copy, Package, ShieldCheck, X, Terminal, FileCode2, Play, RefreshCw } from 'lucide-react';
+import { APP_VERSION } from '../version';
 
 interface ApkExportModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenUpdateModal?: () => void;
 }
 
-export const ApkExportModal: React.FC<ApkExportModalProps> = ({ isOpen, onClose }) => {
+export const ApkExportModal: React.FC<ApkExportModalProps> = ({ isOpen, onClose, onOpenUpdateModal }) => {
   const [activeTab, setActiveTab] = useState<'terminal' | 'pwabuilder' | 'webapk' | 'capacitor' | 'qr'>('terminal');
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -100,6 +102,41 @@ npx cap open android`;
           >
             <X className="w-5 h-5" />
           </button>
+        </div>
+
+        {/* Live OTA & Direct APK Banner */}
+        <div className="bg-slate-950/80 border-b border-slate-800 px-6 py-3 flex flex-wrap items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="text-xs text-slate-300 font-medium">
+              Sürüm: <strong className="text-white">v{APP_VERSION.versionName}</strong> (Derleme: {APP_VERSION.versionCode})
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {onOpenUpdateModal && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onOpenUpdateModal();
+                }}
+                className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-cyan-400 hover:text-cyan-300 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Güncellemeleri Kontrol Et</span>
+              </button>
+            )}
+
+            <a
+              href={APP_VERSION.apkUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 text-xs font-bold flex items-center gap-1.5 transition shadow-sm cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Resmi APK İndir</span>
+            </a>
+          </div>
         </div>
 
         {/* Tab Selection */}

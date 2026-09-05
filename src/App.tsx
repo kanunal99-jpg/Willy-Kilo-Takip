@@ -29,8 +29,10 @@ import { WillyCoachTab } from './components/WillyCoachTab';
 import { CloudSyncModal } from './components/CloudSyncModal';
 import { ProfileModal } from './components/ProfileModal';
 import { ApkExportModal } from './components/ApkExportModal';
+import { UpdateModal } from './components/UpdateModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { PWAInstallButton } from './components/PWAInstallButton';
+import { APP_VERSION } from './version';
 
 export function App() {
   // Navigation
@@ -54,8 +56,34 @@ export function App() {
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isApkModalOpen, setIsApkModalOpen] = useState(false);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [hasAvailableUpdate, setHasAvailableUpdate] = useState(false);
+  const [latestVersionName, setLatestVersionName] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTimestamp, setLastSyncTimestamp] = useState<number>(Date.now());
+
+  // Automatic unobtrusive background update check (3 seconds after startup)
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      try {
+        const query = new URLSearchParams({
+          currentVersion: APP_VERSION.versionName,
+          currentCode: String(APP_VERSION.versionCode),
+        });
+        const res = await fetch(`/api/app-version?${query.toString()}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.hasUpdate) {
+            setHasAvailableUpdate(true);
+            setLatestVersionName(data.versionName);
+          }
+        }
+      } catch {
+        // Silent in background
+      }
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Current day data accessor
   const todayData: DailyData = dailyLogs[dateKey] || {
@@ -345,8 +373,41 @@ export function App() {
         onOpenSyncModal={() => setIsSyncModalOpen(true)}
         onOpenProfileModal={() => setIsProfileModalOpen(true)}
         onOpenApkModal={() => setIsApkModalOpen(true)}
+        onOpenUpdateModal={() => setIsUpdateModalOpen(true)}
+        hasAvailableUpdate={hasAvailableUpdate}
         isSyncing={isSyncing}
       />
+
+      {/* OTA Update Notification Banner */}
+      {hasAvailableUpdate && (
+        <div className="max-w-2xl w-full mx-auto px-4 pt-2">
+          <div
+            onClick={() => setIsUpdateModalOpen(true)}
+            className="p-3 rounded-2xl bg-gradient-to-r from-cyan-950/70 via-slate-900 to-emerald-950/70 border border-cyan-500/40 flex items-center justify-between gap-3 shadow-lg shadow-cyan-500/10 cursor-pointer hover:border-cyan-400 transition animate-fadeIn"
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-2.5 w-2.5 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
+              </span>
+              <div className="text-xs">
+                <span className="font-bold text-white">Yeni Sürüm Mevcut</span>
+                {latestVersionName && <span className="text-cyan-400 font-semibold ml-1.5">(v{latestVersionName})</span>}
+                <span className="text-slate-400 block text-[11px]">Yenilikleri görmek ve güncellemek için dokunun</span>
+              </div>
+            </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsUpdateModalOpen(true);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-xs shrink-0 transition"
+            >
+              Güncelle
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-2xl w-full mx-auto px-4 py-4 space-y-4">
@@ -461,12 +522,20 @@ export function App() {
         onClose={() => setIsProfileModalOpen(false)}
         profile={profile}
         onSaveProfile={(updated) => setProfile(updated)}
+        onOpenUpdateModal={() => setIsUpdateModalOpen(true)}
       />
 
       {/* APK Export & Download Modal */}
       <ApkExportModal
         isOpen={isApkModalOpen}
         onClose={() => setIsApkModalOpen(false)}
+        onOpenUpdateModal={() => setIsUpdateModalOpen(true)}
+      />
+
+      {/* OTA Software Update Modal */}
+      <UpdateModal
+        isOpen={isUpdateModalOpen}
+        onClose={() => setIsUpdateModalOpen(false)}
       />
 
       {/* PWA Offline indicator */}

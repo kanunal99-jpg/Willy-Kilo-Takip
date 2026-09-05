@@ -1,0 +1,25 @@
+export interface AppVersionInfo {
+  versionName: string;
+  versionCode: number;
+  releaseDate: string;
+  minSupportedVersion: string;
+  apkUrl: string;
+  githubReleaseUrl: string;
+  releaseNotes: string[];
+}
+
+export const APP_VERSION: AppVersionInfo = {
+  versionName: '1.0.1',
+  versionCode: 2,
+  releaseDate: '2026-09-05',
+  minSupportedVersion: '1.0.0',
+  apkUrl: 'https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest/download/WillyKiloTakip.apk',
+  githubReleaseUrl: 'https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest',
+  releaseNotes: [
+    'Gerçek Gemini AI Willy Koç ve Fotoğraflı Yemek Analizi aktif',
+    'Canlı OTA Güncelleme Sistemi: Tek tıkla uygulama içi güncelleme kontrolü ve APK indirme',
+    'Otomatik GitHub Actions Release ve APK dağıtımı',
+    'PWA ve Offline-First yerel veri koruma mimarisi',
+    'Render production dinamik port ve çökme düzeltmeleri',
+  ],
+};

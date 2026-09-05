@@ -74,6 +74,109 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// App Version & OTA Update Manifest Endpoint
+const VERSION_FILE = path.join(process.cwd(), 'version.json');
+let cachedRelease: { timestamp: number; data: any } | null = null;
+
+app.get(['/api/app-version', '/api/app-version/manifest.json'], async (req, res) => {
+  try {
+    let localVersion = {
+      versionName: '1.0.1',
+      versionCode: 2,
+      releaseDate: '2026-09-05',
+      minSupportedVersion: '1.0.0',
+      apkUrl: 'https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest/download/WillyKiloTakip.apk',
+      githubReleaseUrl: 'https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest',
+      releaseNotes: [
+        'Gerçek Gemini AI Willy Koç ve Fotoğraflı Yemek Analizi aktif',
+        'Canlı OTA Güncelleme Sistemi: Tek tıkla uygulama içi güncelleme kontrolü ve APK indirme',
+        'Otomatik GitHub Actions Release ve APK dağıtımı',
+        'PWA ve Offline-First yerel veri koruma mimarisi',
+      ],
+      mandatory: false,
+    };
+
+    if (fs.existsSync(VERSION_FILE)) {
+      try {
+        localVersion = JSON.parse(fs.readFileSync(VERSION_FILE, 'utf-8'));
+      } catch (e) {
+        console.error('Error reading version.json:', e);
+      }
+    }
+
+    const currentVersionQuery = (req.query.currentVersion as string) || '';
+    const currentCodeQuery = Number(req.query.currentCode) || 0;
+
+    // Check GitHub release with 5-minute memory cache
+    let latestGithubData: any = null;
+    const now = Date.now();
+    if (cachedRelease && now - cachedRelease.timestamp < 300000) {
+      latestGithubData = cachedRelease.data;
+    } else {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 2500);
+        const ghRes = await fetch('https://api.github.com/repos/kanunal99-jpg/Willy-Kilo-Takip/releases/latest', {
+          headers: { 'User-Agent': 'WillyKiloTakip-OTA-Checker' },
+          signal: controller.signal,
+        });
+        clearTimeout(timeout);
+        if (ghRes.ok) {
+          const ghJson: any = await ghRes.json();
+          if (ghJson && ghJson.tag_name) {
+            const apkAsset = Array.isArray(ghJson.assets)
+              ? ghJson.assets.find((a: any) => a.name?.endsWith('.apk'))
+              : null;
+
+            latestGithubData = {
+              versionName: ghJson.tag_name.replace(/^v/, ''),
+              versionCode: localVersion.versionCode,
+              releaseDate: ghJson.published_at ? ghJson.published_at.split('T')[0] : localVersion.releaseDate,
+              releaseNotes: ghJson.body ? ghJson.body.split('\n').filter((l: string) => l.trim().length > 0) : localVersion.releaseNotes,
+              apkUrl: apkAsset ? apkAsset.browser_download_url : localVersion.apkUrl,
+              githubReleaseUrl: ghJson.html_url || localVersion.githubReleaseUrl,
+            };
+            cachedRelease = { timestamp: now, data: latestGithubData };
+          }
+        }
+      } catch (err) {
+        // Fallback to localVersion if GitHub is unreachable or ratelimited
+      }
+    }
+
+    const effective = latestGithubData || localVersion;
+
+    // Check if client is on an older version
+    const hasUpdate = (() => {
+      if (currentCodeQuery > 0 && effective.versionCode) {
+        return effective.versionCode > currentCodeQuery;
+      }
+      if (currentVersionQuery) {
+        const cleanCurr = currentVersionQuery.replace(/^v/, '').trim();
+        const cleanLatest = String(effective.versionName).replace(/^v/, '').trim();
+        return cleanCurr !== cleanLatest;
+      }
+      return false;
+    })();
+
+    res.json({
+      success: true,
+      versionName: effective.versionName,
+      versionCode: effective.versionCode || localVersion.versionCode,
+      releaseDate: effective.releaseDate,
+      releaseNotes: effective.releaseNotes,
+      apkUrl: effective.apkUrl,
+      githubReleaseUrl: effective.githubReleaseUrl,
+      mandatory: false,
+      hasUpdate,
+      clientVersion: currentVersionQuery || undefined,
+      checkedAt: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // Cloud Sync: GET user data
 app.get('/api/sync/:userId', (req, res) => {
   const { userId } = req.params;

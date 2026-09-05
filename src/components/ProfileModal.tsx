@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { UserProfile, UserGoal, ActivityLevel, FastingPlanType } from '../types';
-import { X, Check, Calculator, Sparkles, User } from 'lucide-react';
+import { X, Check, Calculator, Sparkles, User, RefreshCw } from 'lucide-react';
+import { APP_VERSION } from '../version';
 
 interface ProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
   profile: UserProfile;
   onSaveProfile: (updated: UserProfile) => void;
+  onOpenUpdateModal?: () => void;
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
@@ -14,6 +16,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onClose,
   profile,
   onSaveProfile,
+  onOpenUpdateModal,
 }) => {
   const [formData, setFormData] = useState<UserProfile>({ ...profile });
 
@@ -264,6 +267,34 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 />
               </div>
             </div>
+          </div>
+
+          {/* App Version & OTA Update Section */}
+          <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-3.5 space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Uygulama Bilgisi</span>
+                <span className="text-white font-bold">Willy Kilo Takip v{APP_VERSION.versionName}</span>
+                <span className="text-slate-500 text-[11px] ml-1">(Derleme: {APP_VERSION.versionCode})</span>
+              </div>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                PRO
+              </span>
+            </div>
+
+            {onOpenUpdateModal && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenUpdateModal();
+                }}
+                className="w-full mt-1 py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-cyan-400 hover:text-cyan-300 font-semibold text-xs flex items-center justify-center gap-2 transition cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>🔄 Güncellemeleri Kontrol Et</span>
+              </button>
+            )}
           </div>
         </div>
 
