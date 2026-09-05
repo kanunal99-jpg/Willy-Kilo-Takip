@@ -9,16 +9,16 @@ export interface AppVersionInfo {
 }
 
 export const APP_VERSION: AppVersionInfo = {
-  versionName: '1.0.2',
-  versionCode: 3,
+  versionName: '1.0.3',
+  versionCode: 4,
   releaseDate: '2026-09-05',
-  minSupportedVersion: '1.0.1',
+  minSupportedVersion: '1.0.2',
   apkUrl: 'https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest/download/WillyKiloTakip.apk',
   githubReleaseUrl: 'https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest',
   releaseNotes: [
-    'Hata temizliği ve TypeScript CI doğrulaması',
-    'Bulut senkronizasyonunda veri kalıcılığı ve yerel ID güvenliği iyileştirildi',
-    'Yemek barkod araması gerçek yerel yemek veritabanına bağlandı',
-    'OTA güncelleme zinciri 1.0.2 sürümüne yükseltildi',
+    'Willy AI Koç artık gerçek Gemini yanıtını kullanıyor',
+    'Kullanıcı sorusuna göre kişiselleştirilmiş cevap üretimi düzeltildi',
+    'Sabit/fake AI fallback kaldırıldı; gerçek AI hataları görünür hale getirildi',
+    'Gemini model uyumluluğu için güncel üretim modelleriyle otomatik fallback eklendi',
   ],
 };
