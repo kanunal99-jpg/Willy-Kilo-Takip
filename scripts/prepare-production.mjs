@@ -27,6 +27,13 @@ fs.writeFileSync(foodPath, food);
 const serverPath = 'server.ts';
 let server = fs.readFileSync(serverPath, 'utf8');
 
+const quotaHelper = `function isGeminiQuotaExhaustedError(err: any): boolean {\n  const message = String(err?.message || err || '').toLowerCase();\n  return message.includes('prepayment credits are depleted') ||\n    message.includes('prepayment') && message.includes('depleted') ||\n    message.includes('resource_exhausted') && message.includes('credit');\n}\n\nfunction geminiQuotaResponse(res: express.Response) {\n  return res.status(429).json({\n    success: false,\n    error: 'Gemini AI kredisi tükenmiş. AI Studio projesinin billing/prepay bakiyesini yenileyin.',\n    code: 'AI_QUOTA_EXHAUSTED'\n  });\n}\n\n`;
+if (!server.includes('function isGeminiQuotaExhaustedError')) {
+  const helperMarker = 'app.get(\'/api/health\'';
+  if (!server.includes(helperMarker)) throw new Error('AI helper insertion marker not found; refusing unsafe patch');
+  server = server.replace(helperMarker, quotaHelper + helperMarker);
+}
+
 const oldAiLine = "const response = await ai.models.generateContent({ model: 'gemini-3.6-flash', contents, config: { responseMimeType: 'application/json' } });";
 const newAiBlock = `const models = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-2.5-flash'];
     let response: any = null;
@@ -48,6 +55,7 @@ const newAiBlock = `const models = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gem
       } catch (err: any) {
         lastError = err;
         console.error(\`AI Food Analysis model=\${model} failed:\`, err?.message || err);
+        if (isGeminiQuotaExhaustedError(err)) return geminiQuotaResponse(res);
       }
     }
     if (!response?.text) throw lastError || new Error('Gemini AI boş yanıt döndürdü');`;
@@ -58,5 +66,22 @@ if (server.includes(oldAiLine)) {
   throw new Error('AI food generateContent target not found; refusing unsafe patch');
 }
 
+// Make AI Coach stop immediately on the same depleted-credit condition instead of burning through every fallback model.
+const coachCatchNeedle = /      } catch \(err: any\) \{\n        lastError = err;\n        console\.error\(`AI Coach model=\$\{model\} failed:`, err\?\.message \|\| err\);\n      \}/;
+const coachCatchReplacement = `      } catch (err: any) {
+        lastError = err;
+        console.error(\`AI Coach model=\${model} failed:\`, err?.message || err);
+        if (isGeminiQuotaExhaustedError(err)) return geminiQuotaResponse(res);
+      }`;
+if (coachCatchNeedle.test(server)) {
+  server = server.replace(coachCatchNeedle, coachCatchReplacement);
+}
+
+// Surface quota exhaustion cleanly if the final fallback throws it outside the loop.
+const coachFinalNeedle = "return res.status(502).json({ success: false, error: 'Gemini AI yanıt üretemedi: ' + (lastError?.message || 'Bilinmeyen hata'), code: 'AI_REQUEST_FAILED' });";
+if (server.includes(coachFinalNeedle)) {
+  server = server.replace(coachFinalNeedle, "if (isGeminiQuotaExhaustedError(lastError)) return geminiQuotaResponse(res);\n    " + coachFinalNeedle);
+}
+
 fs.writeFileSync(serverPath, server);
-console.log('Production AI patch PASS: native API base + image MIME + Gemini fallback applied.');
+console.log('Production AI patch PASS: native API base + image MIME + Gemini fallback + quota classification applied.');
