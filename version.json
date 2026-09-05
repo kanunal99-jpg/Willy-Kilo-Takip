@@ -1,11 +1,14 @@
 {
-  "versionName": "1.0.10",
-  "versionCode": 11,
+  "versionName": "1.0.9",
+  "versionCode": 10,
   "releaseDate": "2026-09-06",
   "minSupportedVersion": "1.0.3",
   "apkUrl": "https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest/download/WillyKiloTakip.apk",
   "githubReleaseUrl": "https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest",
   "releaseNotes": [
+    "Gemini kota/ön ödeme tükenirse OpenAI AI fallback otomatik devreye girer",
+    "AI Tara fotoğraf analizi OpenAI görsel girişi ile fallback destekler",
+    "Willy Koç Gemini başarısız olduğunda OpenAI ile devam eder",
     "Gemini kota/ön ödeme tükenirse OpenAI AI fallback otomatik devreye girer",
     "AI Tara fotoğraf analizi OpenAI görsel girişi ile fallback destekler",
     "Willy Koç Gemini başarısız olduğunda OpenAI ile devam eder",
