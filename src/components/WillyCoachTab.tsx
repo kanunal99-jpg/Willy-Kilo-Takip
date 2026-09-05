@@ -9,6 +9,13 @@ interface WillyCoachTabProps {
   onUpdateProfile: (updated: Partial<UserProfile>) => void;
 }
 
+// Native Capacitor builds do not have the Render server at the app's local origin.
+// Keep web same-origin, but send native API calls to the production backend.
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').trim() ||
+  ((typeof window !== 'undefined' && (window.location.protocol === 'capacitor:' || window.location.hostname === 'localhost'))
+    ? 'https://willy-kilo-takip.onrender.com'
+    : '');
+
 export const WillyCoachTab: React.FC<WillyCoachTabProps> = ({ profile, todayData, activeFast }) => {
   const [messages, setMessages] = useState<Array<{ sender: 'willy' | 'user'; text: string; time: string }>>([
     {
@@ -34,7 +41,7 @@ export const WillyCoachTab: React.FC<WillyCoachTabProps> = ({ profile, todayData
     setIsLoading(true);
 
     try {
-      const res = await fetch('/api/ai/coach', {
+      const res = await fetch(`${API_BASE_URL}/api/ai/coach`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
