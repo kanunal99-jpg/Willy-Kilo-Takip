@@ -64,7 +64,7 @@ export const saveRecipes = (recipes: Recipe[]): void => { try { localStorage.set
 export interface SyncResult { success: boolean; message: string; timestamp?: number; dataUpdated?: boolean; data?: any; }
 
 export const syncWithCloud = async (
-  profile: UserProfile, dailyLogs: Record<string, DailyData>, fastingHistory: FastingSession[], weightRecords: WeightRecord[], customRecipes: Recipe[] = [], forcePull = false
+  profile: UserProfile, dailyLogs: Record<string, DailyData>, fastingHistory: FastingSession[], weightRecords: WeightRecord[], forcePull = false, customRecipes: Recipe[] = []
 ): Promise<SyncResult> => {
   try {
     const userId = profile.cloudSyncKey || profile.id;
