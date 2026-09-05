@@ -9,19 +9,19 @@ if (!fs.existsSync(manifestPath)) {
 let xml = fs.readFileSync(manifestPath, 'utf8');
 
 if (!/android:name=["']android\.permission\.CAMERA["']/.test(xml)) {
-  const usesSdk = xml.match(/\s*<uses-sdk\b[^>]*\/?>/);
-  const permission = '    <uses-permission android:name="android.permission.CAMERA" />\n';
-  if (usesSdk?.index !== undefined) {
-    xml = xml.slice(0, usesSdk.index) + permission + xml.slice(usesSdk.index);
-  } else {
-    const manifestEnd = xml.indexOf('>') + 1;
-    xml = xml.slice(0, manifestEnd) + '\n' + permission + xml.slice(manifestEnd);
+  const manifestOpen = xml.match(/<manifest\b[^>]*>/);
+  if (!manifestOpen || manifestOpen.index === undefined) {
+    throw new Error('Could not locate <manifest> in AndroidManifest.xml');
   }
+  const insertAt = manifestOpen.index + manifestOpen[0].length;
+  const permission = '\n    <uses-permission android:name="android.permission.CAMERA" />';
+  xml = xml.slice(0, insertAt) + permission + xml.slice(insertAt);
 }
 
 const dependencyName = 'com.google.mlkit.vision.DEPENDENCIES';
+const escapedDependencyName = dependencyName.replace(/\./g, '\\.');
 const metadataRegex = new RegExp(
-  `<meta-data\\b[^>]*android:name=["']${dependencyName.replace(/\./g, '\\.') }["'][^>]*/>`
+  `<meta-data\\b[^>]*android:name=["']${escapedDependencyName}["'][^>]*/>`
 );
 
 if (metadataRegex.test(xml)) {
