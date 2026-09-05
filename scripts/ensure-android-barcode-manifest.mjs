@@ -19,37 +19,31 @@ if (!/android:name=["']android\.permission\.CAMERA["']/.test(xml)) {
 }
 
 const dependencyName = 'com.google.mlkit.vision.DEPENDENCIES';
-const escapedDependencyName = dependencyName.replace(/\./g, '\\.');
 const metadataRegex = new RegExp(
-  `<meta-data\\b[^>]*android:name=["']${escapedDependencyName}["'][^>]*/>`
+  `\\s*<meta-data\\b[^>]*android:name=["']${dependencyName.replace(/\./g, '\\\\.')}["'][^>]*/>`,
+  'g'
 );
 
-if (metadataRegex.test(xml)) {
-  xml = xml.replace(metadataRegex, (tag) => {
-    if (/android:value=["']barcode_ui["']/.test(tag)) return tag;
-    if (/android:value=["'][^"']*["']/.test(tag)) {
-      return tag.replace(/android:value=["'][^"']*["']/, 'android:value="barcode_ui"');
-    }
-    return tag.replace(/\s*\/>$/, ' android:value="barcode_ui" />');
-  });
-} else {
-  const applicationTag = xml.match(/<application\b[^>]*>/);
-  if (!applicationTag || applicationTag.index === undefined) {
-    throw new Error('Could not locate <application> in AndroidManifest.xml');
-  }
-  const insertAt = applicationTag.index + applicationTag[0].length;
-  const metadata = '\n        <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="barcode_ui" />';
-  xml = xml.slice(0, insertAt) + metadata + xml.slice(insertAt);
+// Capacitor/ML Kit can already contribute this metadata. Remove every duplicate and
+// install exactly one deterministic barcode_ui declaration under <application>.
+xml = xml.replace(metadataRegex, '');
+
+const applicationTag = xml.match(/<application\b[^>]*>/);
+if (!applicationTag || applicationTag.index === undefined) {
+  throw new Error('Could not locate <application> in AndroidManifest.xml');
 }
+const insertAt = applicationTag.index + applicationTag[0].length;
+const metadata = '\n        <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="barcode_ui" />';
+xml = xml.slice(0, insertAt) + metadata + xml.slice(insertAt);
 
 fs.writeFileSync(manifestPath, xml.endsWith('\n') ? xml : xml + '\n');
 
 const finalXml = fs.readFileSync(manifestPath, 'utf8');
-if (!/android:name=["']android\.permission\.CAMERA["']/.test(finalXml)) {
-  throw new Error('CAMERA permission verification failed');
-}
-if (!finalXml.includes(`android:name="${dependencyName}"`) || !finalXml.includes('android:value="barcode_ui"')) {
-  throw new Error('ML Kit barcode_ui metadata verification failed');
+const cameraCount = (finalXml.match(/android:name=["']android\.permission\.CAMERA["']/g) || []).length;
+const metadataCount = (finalXml.match(/android:name=["']com\.google\.mlkit\.vision\.DEPENDENCIES["']/g) || []).length;
+if (cameraCount < 1) throw new Error('CAMERA permission verification failed');
+if (metadataCount !== 1 || !finalXml.includes('android:value="barcode_ui"')) {
+  throw new Error(`ML Kit barcode_ui metadata verification failed: expected 1 declaration, found ${metadataCount}`);
 }
 
-console.log('Android barcode manifest PASS: CAMERA + barcode_ui declared.');
+console.log(`Android barcode manifest PASS: CAMERA + exactly one barcode_ui declaration (camera=${cameraCount}, metadata=${metadataCount}).`);
