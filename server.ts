@@ -114,8 +114,55 @@ function getGemini(): GoogleGenAI | null {
   return aiClient;
 }
 
+function hasOpenAI(): boolean {
+  return !!process.env.OPENAI_API_KEY?.trim();
+}
+
+function isGeminiQuotaError(err: any): boolean {
+  const text = String(err?.message || err || '').toLowerCase();
+  return text.includes('resource_exhausted') || text.includes('resource exhausted') || text.includes('quota') || text.includes('prepayment credits are depleted') || text.includes('billing');
+}
+
+function extractOpenAIText(data: any): string {
+  if (typeof data?.output_text === 'string' && data.output_text.trim()) return data.output_text.trim();
+  const chunks = Array.isArray(data?.output) ? data.output.flatMap((item: any) => Array.isArray(item?.content) ? item.content : []) : [];
+  return chunks.filter((c: any) => c?.type === 'output_text' && typeof c?.text === 'string').map((c: any) => c.text).join('').trim();
+}
+
+async function callOpenAI(prompt: string, imageBase64?: string, mimeType = 'image/jpeg'): Promise<string> {
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  if (!apiKey) throw new Error('OPENAI_API_KEY production ortamında tanımlı değil.');
+  const content: any[] = [{ type: 'input_text', text: prompt }];
+  if (imageBase64) {
+    const cleanBase64 = imageBase64.replace(/^data:[^;]+;base64,/, '');
+    content.push({ type: 'input_image', image_url: `data:${mimeType};base64,${cleanBase64}` });
+  }
+  const response = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: process.env.OPENAI_MODEL?.trim() || 'gpt-5.6-luna',
+      input: [{ role: 'user', content }],
+    }),
+  });
+  const data: any = await response.json();
+  if (!response.ok) throw new Error(data?.error?.message || `OpenAI HTTP ${response.status}`);
+  const text = extractOpenAIText(data);
+  if (!text) throw new Error('OpenAI boş yanıt döndürdü.');
+  return text;
+}
+
+function parseAiJson(text: string): any {
+  try { return JSON.parse(text); }
+  catch {
+    const match = text.match(/\{[\s\S]*\}/);
+    if (match) return JSON.parse(match[0]);
+    throw new Error('AI JSON yanıtı çözümlenemedi');
+  }
+}
+
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', app: 'Willy Kilo Takip', aiEnabled: !!process.env.GEMINI_API_KEY, timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', app: 'Willy Kilo Takip', aiEnabled: !!(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY), aiProviders: { gemini: !!process.env.GEMINI_API_KEY, openai: !!process.env.OPENAI_API_KEY }, timestamp: new Date().toISOString() });
 });
 
 const VERSION_FILE = path.join(process.cwd(), 'version.json');
@@ -206,19 +253,23 @@ app.post('/api/sync/:userId', (req, res) => {
 app.post('/api/ai/analyze-food', async (req, res) => {
   try {
     const { imageBase64, mimeType = 'image/jpeg', description, mealType = 'lunch' } = req.body;
-    const ai = getGemini();
-    if (!ai) return res.status(503).json({ success: false, error: 'GEMINI_API_KEY production ortamında tanımlı değil.', code: 'AI_NOT_CONFIGURED' });
-
     const promptText = `Sen dünya standartlarında bir AI Beslenme Uzmanı ve Diyetisyensin. Kullanıcı "${mealType}" öğünü için bir yemek fotoğrafı veya açıklaması gönderdi. ${description ? `Kullanıcı notu: "${description}".` : ''}\n\nYemeği detaylıca analiz et ve sadece geçerli JSON nesnesi olarak yanıt ver.\nFormat: {"name":"Yemeğin Türkçe adı","calories":420,"protein":32,"carbs":35,"fat":16,"fiber":6,"healthScore":90,"pros":["İyi protein kaynağı"],"cons":["Orta sodyum"],"advice":"1-2 cümlelik kişisel tavsiye","breakdown":[{"item":"Malzeme","calories":250,"amount":"150g"}]}`;
-    const contents: any[] = [];
-    if (imageBase64) contents.push({ inlineData: { mimeType, data: imageBase64.replace(/^data:image\/\w+;base64,/, '') } });
-    contents.push(promptText);
-    const response = await ai.models.generateContent({ model: 'gemini-3.6-flash', contents, config: { responseMimeType: 'application/json' } });
-    const responseText = response.text || '{}';
-    let parsed: any;
-    try { parsed = JSON.parse(responseText); }
-    catch { const match = responseText.match(/\{[\s\S]*\}/); if (match) parsed = JSON.parse(match[0]); else throw new Error('AI JSON yanıtı çözümlenemedi'); }
-    return res.json({ success: true, data: parsed });
+    const ai = getGemini();
+    if (ai) {
+      try {
+        const contents: any[] = [];
+        if (imageBase64) contents.push({ inlineData: { mimeType, data: imageBase64.replace(/^data:image\/\w+;base64,/, '') } });
+        contents.push(promptText);
+        const response = await ai.models.generateContent({ model: 'gemini-3.6-flash', contents, config: { responseMimeType: 'application/json' } });
+        return res.json({ success: true, data: parseAiJson(response.text || '{}'), provider: 'gemini', model: 'gemini-3.6-flash' });
+      } catch (err: any) {
+        console.error(`AI Food Gemini failed${isGeminiQuotaError(err) ? ' (quota/billing)' : ''}:`, err?.message || err);
+        if (!hasOpenAI()) throw err;
+      }
+    }
+    if (!hasOpenAI()) return res.status(503).json({ success: false, error: 'AI sağlayıcısı yapılandırılmamış.', code: 'AI_NOT_CONFIGURED' });
+    const openAiText = await callOpenAI(promptText, imageBase64, mimeType);
+    return res.json({ success: true, data: parseAiJson(openAiText), provider: 'openai', model: process.env.OPENAI_MODEL?.trim() || 'gpt-5.6-luna', fallback: true });
   } catch (err: any) {
     console.error('AI Food Analysis Error:', err);
     return res.status(502).json({ success: false, error: 'AI yemek analizi başarısız: ' + (err.message || 'Bilinmeyen hata'), code: 'AI_REQUEST_FAILED' });
@@ -229,50 +280,37 @@ app.post('/api/ai/coach', async (req, res) => {
   const startedAt = Date.now();
   try {
     const { message, userProfile, todaySummary } = req.body || {};
-    const ai = getGemini();
-    if (!ai) return res.status(503).json({ success: false, error: 'GEMINI_API_KEY production ortamında tanımlı değil.', code: 'AI_NOT_CONFIGURED' });
-
     const userMessage = String(message || '').trim() || 'Bugünkü ilerlememi ve bana tavsiyelerini söyler misin?';
-    const systemPrompt = `Sen "Willy Kilo Takip" uygulamasının sevimli, sempatik, bilimsel ve motive edici yapay zeka koçu Willy'sin.
-Kullanıcının verileri:
-- Hedef: ${userProfile?.goal === 'lose_weight' ? 'Kilo Vermek' : 'Kilo Korumak / Kas Kazanmak'}
-- Güncel Kilo: ${userProfile?.currentWeightKg ?? 'bilinmiyor'} kg, Hedef: ${userProfile?.targetWeightKg ?? 'bilinmiyor'} kg
-- Günlük Kalori Hedefi: ${userProfile?.dailyCalorieTarget ?? 'bilinmiyor'} kcal
-- Bugün Alınan: ${todaySummary?.consumedCalories || 0} kcal, Yakılan: ${todaySummary?.burnedCalories || 0} kcal
-- Bugün Su: ${(todaySummary?.waterMl || 0) / 1000} L (Hedef: ${(userProfile?.waterTargetMl || 2000) / 1000} L)
-- Aralıklı Oruç: ${todaySummary?.fastingActive ? 'aktif' : 'aktif değil'}
+    const systemPrompt = `Sen "Willy Kilo Takip" uygulamasının sevimli, sempatik, bilimsel ve motive edici yapay zeka koçu Willy'sin.\nKullanıcının verileri:\n- Hedef: ${userProfile?.goal === 'lose_weight' ? 'Kilo Vermek' : 'Kilo Korumak / Kas Kazanmak'}\n- Güncel Kilo: ${userProfile?.currentWeightKg ?? 'bilinmiyor'} kg, Hedef: ${userProfile?.targetWeightKg ?? 'bilinmiyor'} kg\n- Günlük Kalori Hedefi: ${userProfile?.dailyCalorieTarget ?? 'bilinmiyor'} kcal\n- Bugün Alınan: ${todaySummary?.consumedCalories || 0} kcal, Yakılan: ${todaySummary?.burnedCalories || 0} kcal\n- Bugün Su: ${(todaySummary?.waterMl || 0) / 1000} L (Hedef: ${(userProfile?.waterTargetMl || 2000) / 1000} L)\n- Aralıklı Oruç: ${todaySummary?.fastingActive ? 'aktif' : 'aktif değil'}\n\nKURALLAR:\n1. Kullanıcının yazdığı soruya doğrudan cevap ver; soruyu yok sayma.\n2. Her soruya aynı cevabı verme. Konuya göre öneri üret.\n3. Kullanıcının mevcut verilerini gerektiğinde cevaba bağla.\n4. Kilo verme konusunda aşırı kısıtlayıcı veya tıbben riskli öneriler verme.\n5. Yanıtı Türkçe, doğal, kısa ama uygulanabilir ver. Gerektiğinde maddeler kullan.\n6. Tanı koyma; ciddi sağlık durumlarında doktora yönlendir.\n\nKullanıcı sorusu: ${userMessage}`;
 
-KURALLAR:
-1. Kullanıcının yazdığı soruya doğrudan cevap ver; soruyu yok sayma.
-2. Her soruya aynı cevabı verme. Konuya göre öneri üret.
-3. Kullanıcının mevcut verilerini gerektiğinde cevaba bağla.
-4. Kilo verme konusunda aşırı kısıtlayıcı veya tıbben riskli öneriler verme.
-5. Yanıtı Türkçe, doğal, kısa ama uygulanabilir ver. Gerektiğinde maddeler kullan.
-6. Tanı koyma; ciddi sağlık durumlarında doktora yönlendir.
-
-Kullanıcı sorusu: ${userMessage}`;
-
-    const models = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash'];
-    let lastError: any = null;
-    for (const model of models) {
-      try {
-        const response = await ai.models.generateContent({ model, contents: systemPrompt });
-        const reply = response.text?.trim();
-        if (reply) {
-          console.log(`AI Coach success model=${model} durationMs=${Date.now() - startedAt}`);
-          return res.json({ success: true, reply, model });
+    const ai = getGemini();
+    if (ai) {
+      const models = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash'];
+      let lastError: any = null;
+      for (const model of models) {
+        try {
+          const response = await ai.models.generateContent({ model, contents: systemPrompt });
+          const reply = response.text?.trim();
+          if (reply) {
+            console.log(`AI Coach success provider=gemini model=${model} durationMs=${Date.now() - startedAt}`);
+            return res.json({ success: true, reply, model, provider: 'gemini' });
+          }
+        } catch (err: any) {
+          lastError = err;
+          console.error(`AI Coach Gemini model=${model} failed${isGeminiQuotaError(err) ? ' (quota/billing)' : ''}:`, err?.message || err);
+          if (isGeminiQuotaError(err)) break;
         }
-        lastError = new Error(`Model ${model} boş yanıt döndürdü`);
-      } catch (err: any) {
-        lastError = err;
-        console.error(`AI Coach model=${model} failed:`, err?.message || err);
       }
+      if (!hasOpenAI() && lastError) throw lastError;
     }
 
-    return res.status(502).json({ success: false, error: 'Gemini AI yanıt üretemedi: ' + (lastError?.message || 'Bilinmeyen hata'), code: 'AI_REQUEST_FAILED' });
+    if (!hasOpenAI()) return res.status(503).json({ success: false, error: 'AI sağlayıcısı yapılandırılmamış.', code: 'AI_NOT_CONFIGURED' });
+    const reply = await callOpenAI(systemPrompt);
+    console.log(`AI Coach success provider=openai model=${process.env.OPENAI_MODEL?.trim() || 'gpt-5.6-luna'} durationMs=${Date.now() - startedAt}`);
+    return res.json({ success: true, reply, model: process.env.OPENAI_MODEL?.trim() || 'gpt-5.6-luna', provider: 'openai', fallback: true });
   } catch (err: any) {
     console.error('AI Coach Error:', err);
-    return res.status(500).json({ success: false, error: 'AI koç isteği işlenemedi: ' + (err.message || 'Bilinmeyen hata'), code: 'AI_SERVER_ERROR' });
+    return res.status(502).json({ success: false, error: 'AI koç isteği işlenemedi: ' + (err.message || 'Bilinmeyen hata'), code: 'AI_REQUEST_FAILED' });
   }
 });
 

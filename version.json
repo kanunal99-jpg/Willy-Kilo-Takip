@@ -1,11 +1,14 @@
 {
-  "versionName": "1.0.8",
-  "versionCode": 9,
-  "releaseDate": "2026-09-05",
+  "versionName": "1.0.9",
+  "versionCode": 10,
+  "releaseDate": "2026-09-06",
   "minSupportedVersion": "1.0.3",
   "apkUrl": "https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest/download/WillyKiloTakip.apk",
   "githubReleaseUrl": "https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest",
   "releaseNotes": [
+    "Gemini kota/ön ödeme tükenirse OpenAI AI fallback otomatik devreye girer",
+    "AI Tara fotoğraf analizi OpenAI görsel girişi ile fallback destekler",
+    "Willy Koç Gemini başarısız olduğunda OpenAI ile devam eder",
     "AI Tara production API bağlantısı native Android için sabitlendi",
     "AI yemek analizinde gerçek fotoğraf MIME türü korunuyor",
     "Gemini yemek analizine çoklu model fallback zinciri eklendi",
