@@ -18,9 +18,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
       - name: Install dependencies
         run: npm install
+
+      - name: TypeScript validation
+        run: npm run lint
 
       - name: Build web app
         run: npm run build
@@ -77,12 +81,12 @@ jobs:
             ## 🐾 Willy Kilo Takip v${{ steps.version.outputs.VERSION }}
             
             ### ✨ Yenilikler ve Güncellemeler:
-            - 🤖 **Gerçek Gemini AI Willy Koç & Yemek Analizi**: Beslenme tavsiyeleri ve fotoğraflı makro analizi
-            - 🔄 **Canlı OTA Güncelleme Sistemi**: Uygulama içinden tek tıkla güncelleme kontrolü ve APK indirme
-            - 📱 **PWA & Offline-First**: İnternet olmadan da kesintisiz veri kaydı ve yerel hafıza güvenliği
-            - ⚡ **Performans İyileştirmeleri**: Hızlı açılış ve akıcı animasyonlar
+            - 🤖 **Gerçek Gemini AI Willy Koç & Yemek Analizi**
+            - 🔄 **Canlı OTA Güncelleme Sistemi**
+            - 📱 **PWA & Offline-First**
+            - ⚡ **TypeScript doğrulaması ve performans iyileştirmeleri**
             
-            **İndirme:** Aşağıdaki `WillyKiloTakip.apk` dosyasını Android cihazınıza indirip doğrudan kurabilirsiniz.
+            **İndirme:** `WillyKiloTakip.apk`
           files: |
             release-assets/WillyKiloTakip.apk
             release-assets/WillyKiloTakip-v${{ steps.version.outputs.VERSION }}.apk
