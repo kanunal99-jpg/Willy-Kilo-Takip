@@ -15,7 +15,8 @@ export const getTodayKey = (date: Date = new Date()): string => {
 
 export const loadUserProfile = (): UserProfile => {
   try { const raw = localStorage.getItem(STORAGE_KEYS.PROFILE); if (raw) return JSON.parse(raw); } catch (e) { console.error('Failed to load profile:', e); }
-  return { ...INITIAL_USER_PROFILE, id: crypto.randomUUID ? crypto.randomUUID() : `user-${Date.now()}-${Math.random().toString(36).slice(2)}`, cloudSyncKey: `WILLY-${Math.floor(100000 + Math.random() * 900000)}`, diamonds: 0, streakDays: 0 };
+  const generatedId = globalThis.crypto?.randomUUID?.() || `user-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return { ...INITIAL_USER_PROFILE, id: generatedId, cloudSyncKey: `WILLY-${Math.floor(100000 + Math.random() * 900000)}`, diamonds: 0, streakDays: 0 };
 };
 export const saveUserProfile = (profile: UserProfile): void => { try { localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile)); } catch (e) { console.error('Failed to save profile:', e); } };
 
@@ -73,7 +74,17 @@ export const syncWithCloud = async (
       const res = await fetch(`/api/sync/${encodeURIComponent(userId)}`);
       if (!res.ok) throw new Error(`Cloud GET failed: ${res.status}`);
       const json = await res.json();
-      if (json.success && json.found && json.data) return { success: true, message: 'Buluttan veriler başarıyla çekildi.', timestamp: json.data.lastUpdated, dataUpdated: true, data: json.data };
+      if (json.success && json.found && json.data) {
+        const cloud = json.data;
+        if (cloud.profile) saveUserProfile(cloud.profile);
+        if (cloud.dailyLogs) saveDailyLogs(cloud.dailyLogs);
+        if (Array.isArray(cloud.fastingHistory)) saveFastingHistory(cloud.fastingHistory);
+        if (Array.isArray(cloud.weightRecords)) saveWeightRecords(cloud.weightRecords);
+        if (Array.isArray(cloud.customRecipes) && cloud.customRecipes.length > 0) saveRecipes(cloud.customRecipes);
+        localStorage.setItem(STORAGE_KEYS.LAST_SYNC, String(cloud.lastUpdated || Date.now()));
+        window.dispatchEvent(new CustomEvent('willy:cloud-sync-updated'));
+        return { success: true, message: 'Buluttan veriler başarıyla çekildi.', timestamp: cloud.lastUpdated, dataUpdated: true, data: cloud };
+      }
     }
     const res = await fetch(`/api/sync/${encodeURIComponent(userId)}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
