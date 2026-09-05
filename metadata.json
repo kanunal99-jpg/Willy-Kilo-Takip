@@ -1,0 +1,6 @@
+{
+  "name": "Willy Kilo Takip",
+  "description": "Yazio benzeri AI kalori sayacı, aralıklı oruç, su takibi, barkod ve AI fotoğraf tarama, tarifler ve bulut senkronizasyonlu kilo takip uygulaması.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
