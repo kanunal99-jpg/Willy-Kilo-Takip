@@ -1,335 +1,55 @@
-import React, { useState } from 'react';
-import { Scale, TrendingDown, Plus, Target, CheckCircle2, Trash2, Calendar, Award, Activity } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Scale, TrendingDown, Plus, Trash2, Calendar } from 'lucide-react';
 import { UserProfile, WeightRecord } from '../types';
 
-interface WeightTabProps {
-  profile: UserProfile;
-  weightRecords: WeightRecord[];
-  onAddWeight: (record: WeightRecord) => void;
-  onDeleteWeight: (id: string) => void;
-}
+interface WeightTabProps { profile: UserProfile; weightRecords: WeightRecord[]; onAddWeight: (record: WeightRecord) => void; onDeleteWeight: (id: string) => void; }
+type RangeFilter = '7d' | '30d' | '1y' | 'all';
+const inputDate = (ts: number) => { const d = new Date(ts); return new Date(ts - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
 
-export const WeightTab: React.FC<WeightTabProps> = ({
-  profile,
-  weightRecords,
-  onAddWeight,
-  onDeleteWeight,
-}) => {
+export const WeightTab: React.FC<WeightTabProps> = ({ profile, weightRecords, onAddWeight, onDeleteWeight }) => {
   const [showAddModal, setShowAddModal] = useState(false);
-  const [inputWeight, setInputWeight] = useState(String(profile.currentWeightKg));
-  const [inputBodyFat, setInputBodyFat] = useState('');
-  const [inputWaist, setInputWaist] = useState('');
-  const [inputNote, setInputNote] = useState('');
+  const [weight, setWeight] = useState(String(profile.currentWeightKg));
+  const [bodyFat, setBodyFat] = useState('');
+  const [waist, setWaist] = useState('');
+  const [note, setNote] = useState('');
+  const [date, setDate] = useState(inputDate(Date.now()));
+  const [filter, setFilter] = useState<RangeFilter>('all');
 
-  // Latest stats
-  const latestWeight = weightRecords[weightRecords.length - 1]?.weightKg || profile.currentWeightKg;
-  const startWeight = profile.startingWeightKg;
-  const targetWeight = profile.targetWeightKg;
-  const totalChange = Number((latestWeight - startWeight).toFixed(1));
-  const remainingToGoal = Number((latestWeight - targetWeight).toFixed(1));
+  const sorted = useMemo(() => [...weightRecords].sort((a,b) => a.timestamp - b.timestamp), [weightRecords]);
+  const visible = useMemo(() => {
+    if (filter === 'all') return sorted;
+    const days = filter === '7d' ? 7 : filter === '30d' ? 30 : 365;
+    const cutoff = Date.now() - days * 86400000;
+    return sorted.filter(r => r.timestamp >= cutoff);
+  }, [sorted, filter]);
+  const latest = sorted[sorted.length - 1];
+  const latestWeight = latest?.weightKg ?? profile.currentWeightKg;
+  const totalChange = Number((latestWeight - profile.startingWeightKg).toFixed(1));
+  const remaining = Number((latestWeight - profile.targetWeightKg).toFixed(1));
+  const height = profile.heightCm / 100;
+  const bmi = height > 0 ? Number((latestWeight / (height * height)).toFixed(1)) : 0;
+  const bmiCategory = bmi < 18.5 ? 'Zayıf' : bmi < 25 ? 'Normal' : bmi < 30 ? 'Fazla Kilolu' : 'Obezite';
+  const fmt = (ts: number) => new Date(ts).toLocaleDateString('tr-TR', { day:'2-digit', month:'short', year:'numeric' });
 
-  // BMI Calculation
-  const heightM = profile.heightCm / 100;
-  const bmi = Number((latestWeight / (heightM * heightM)).toFixed(1));
-
-  let bmiCategory = 'Normal';
-  let bmiColor = 'text-emerald-400';
-  if (bmi < 18.5) {
-    bmiCategory = 'Zayıf';
-    bmiColor = 'text-amber-400';
-  } else if (bmi >= 25 && bmi < 30) {
-    bmiCategory = 'Fazla Kilolu';
-    bmiColor = 'text-amber-400';
-  } else if (bmi >= 30) {
-    bmiCategory = 'Obezite';
-    bmiColor = 'text-rose-400';
-  }
-
-  const handleSaveWeight = () => {
-    const val = parseFloat(inputWeight);
-    if (!val || isNaN(val)) return;
-
-    const newRecord: WeightRecord = {
-      id: 'w-' + Date.now(),
-      date: new Date().toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }),
-      weightKg: val,
-      bodyFat: inputBodyFat ? parseFloat(inputBodyFat) : undefined,
-      waistCm: inputWaist ? parseFloat(inputWaist) : undefined,
-      note: inputNote || undefined,
-      timestamp: Date.now(),
-    };
-
-    onAddWeight(newRecord);
-    setShowAddModal(false);
-    setInputNote('');
+  const save = () => {
+    const kg = parseFloat(weight);
+    if (!Number.isFinite(kg) || kg <= 0 || !date) return;
+    const selected = new Date(`${date}T12:00:00`);
+    onAddWeight({ id:'w-' + Date.now(), date:selected.toLocaleDateString('tr-TR',{day:'numeric',month:'short'}), weightKg:kg, bodyFat:bodyFat ? parseFloat(bodyFat) : undefined, waistCm:waist ? parseFloat(waist) : undefined, note:note || undefined, timestamp:selected.getTime() });
+    setShowAddModal(false); setBodyFat(''); setWaist(''); setNote(''); setDate(inputDate(Date.now()));
   };
 
-  // SVG Chart points calculation
-  const chartHeight = 130;
-  const chartWidth = 320;
-  const weights = weightRecords.map((r) => r.weightKg);
-  const minW = Math.min(...weights, targetWeight) - 1;
-  const maxW = Math.max(...weights, startWeight) + 1;
-  const range = maxW - minW || 1;
+  const chartH=130, chartW=320, vals=visible.map(r=>r.weightKg), minW=Math.min(...vals, profile.targetWeightKg)-1, maxW=Math.max(...vals, profile.startingWeightKg)+1, span=maxW-minW||1;
+  const points=visible.map((r,i)=>{const x=(i/Math.max(1,visible.length-1))*(chartW-40)+20; const y=chartH-((r.weightKg-minW)/span)*(chartH-30)-15; return {x,y,w:r.weightKg};});
+  const line=points.map(p=>`${p.x},${p.y}`).join(' ');
 
-  const points = weightRecords.map((rec, i) => {
-    const x = (i / Math.max(1, weightRecords.length - 1)) * (chartWidth - 40) + 20;
-    const y = chartHeight - ((rec.weightKg - minW) / range) * (chartHeight - 30) - 15;
-    return { x, y, weight: rec.weightKg, date: rec.date };
-  });
-
-  const polylineStr = points.map((p) => `${p.x},${p.y}`).join(' ');
-
-  return (
-    <div className="space-y-4">
-      {/* Top Banner */}
-      <div className="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/40 border border-emerald-500/20 p-5 shadow-xl">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
-              Kilo ve Vücut Analizi
-            </span>
-            <div className="flex items-baseline gap-2 mt-0.5">
-              <h2 className="text-3xl font-black text-white">{latestWeight}</h2>
-              <span className="text-sm font-semibold text-slate-400">kg</span>
-            </div>
-            <p className="text-xs text-slate-300 mt-1">
-              Başlangıçtan bu yana:{' '}
-              <strong className={totalChange <= 0 ? 'text-emerald-400' : 'text-rose-400'}>
-                {totalChange > 0 ? `+${totalChange}` : totalChange} kg
-              </strong>
-            </p>
-          </div>
-
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 active:scale-95 transition"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Kilo Ekle</span>
-          </button>
-        </div>
-
-        {/* 3 Metric Cards */}
-        <div className="grid grid-cols-3 gap-2 text-center pt-2 border-t border-slate-800">
-          <div className="p-2 rounded-xl bg-slate-950/60 border border-slate-800/80">
-            <span className="text-[10px] text-slate-400 block">Hedef Kilo</span>
-            <strong className="text-sm text-white font-extrabold">{targetWeight} kg</strong>
-            <span className="text-[10px] text-emerald-400 block">
-              {remainingToGoal > 0 ? `${remainingToGoal} kg kaldı` : 'Ulaşıldı!'}
-            </span>
-          </div>
-
-          <div className="p-2 rounded-xl bg-slate-950/60 border border-slate-800/80">
-            <span className="text-[10px] text-slate-400 block">VKİ (BMI)</span>
-            <strong className="text-sm text-white font-extrabold">{bmi}</strong>
-            <span className={`text-[10px] font-bold block ${bmiColor}`}>{bmiCategory}</span>
-          </div>
-
-          <div className="p-2 rounded-xl bg-slate-950/60 border border-slate-800/80">
-            <span className="text-[10px] text-slate-400 block">Başlangıç</span>
-            <strong className="text-sm text-white font-extrabold">{startWeight} kg</strong>
-            <span className="text-[10px] text-slate-400 block">Boy: {profile.heightCm} cm</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Weight Progress Chart */}
-      <div className="rounded-3xl bg-slate-900 border border-slate-800 p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <TrendingDown className="w-4 h-4 text-emerald-400" />
-            <h3 className="text-sm font-bold text-white">Kilo Gelişim Grafiği</h3>
-          </div>
-          <span className="text-xs text-slate-400">{weightRecords.length} ölçüm</span>
-        </div>
-
-        {/* Chart SVG */}
-        <div className="relative overflow-hidden pt-2 pb-1 flex justify-center">
-          <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full max-w-md overflow-visible">
-            {/* Target line */}
-            <line
-              x1="20"
-              y1={chartHeight - ((targetWeight - minW) / range) * (chartHeight - 30) - 15}
-              x2={chartWidth - 20}
-              y2={chartHeight - ((targetWeight - minW) / range) * (chartHeight - 30) - 15}
-              stroke="#10b981"
-              strokeDasharray="4 4"
-              strokeOpacity="0.4"
-              strokeWidth="1.5"
-            />
-            <text
-              x={chartWidth - 55}
-              y={chartHeight - ((targetWeight - minW) / range) * (chartHeight - 30) - 20}
-              fill="#10b981"
-              fontSize="9"
-              fontWeight="bold"
-            >
-              Hedef {targetWeight}kg
-            </text>
-
-            {/* Gradient fill underneath */}
-            <defs>
-              <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#10b981" stopOpacity="0.3" />
-                <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
-              </linearGradient>
-            </defs>
-
-            {points.length > 1 && (
-              <polygon
-                points={`20,${chartHeight - 5} ${polylineStr} ${chartWidth - 20},${chartHeight - 5}`}
-                fill="url(#chartGrad)"
-              />
-            )}
-
-            {/* Line */}
-            {points.length > 1 && (
-              <polyline
-                fill="none"
-                stroke="#10b981"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                points={polylineStr}
-              />
-            )}
-
-            {/* Points */}
-            {points.map((p, idx) => (
-              <g key={idx}>
-                <circle cx={p.x} cy={p.y} r="5" fill="#0f172a" stroke="#34d399" strokeWidth="2.5" />
-                <text
-                  x={p.x}
-                  y={p.y - 8}
-                  fill="#ffffff"
-                  fontSize="9"
-                  fontWeight="bold"
-                  textAnchor="middle"
-                >
-                  {p.weight}
-                </text>
-                <text
-                  x={p.x}
-                  y={chartHeight - 2}
-                  fill="#64748b"
-                  fontSize="8"
-                  textAnchor="middle"
-                >
-                  {p.date}
-                </text>
-              </g>
-            ))}
-          </svg>
-        </div>
-      </div>
-
-      {/* History Table */}
-      <div className="space-y-2">
-        <h3 className="text-sm font-bold text-white px-1">Ölçüm Geçmişi</h3>
-        <div className="space-y-2">
-          {[...weightRecords].reverse().map((rec) => (
-            <div
-              key={rec.id}
-              className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center text-slate-300 font-bold text-xs">
-                  <Scale className="w-4 h-4 text-emerald-400" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <strong className="text-sm font-bold text-white">{rec.weightKg} kg</strong>
-                    {rec.bodyFat && (
-                      <span className="text-[10px] text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded">
-                        %{rec.bodyFat} Yağ
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-xs text-slate-400 block">{rec.date} {rec.note ? `• "${rec.note}"` : ''}</span>
-                </div>
-              </div>
-
-              <button
-                onClick={() => onDeleteWeight(rec.id)}
-                className="p-1.5 text-slate-500 hover:text-rose-400 transition"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Add Weight Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="w-full max-w-sm rounded-3xl bg-slate-900 border border-slate-700 p-6 shadow-2xl text-slate-100 space-y-4">
-            <h3 className="text-base font-bold text-white">Yeni Kilo Kaydı Ekle</h3>
-
-            <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">Kilo (kg) *</label>
-              <input
-                type="number"
-                step="0.1"
-                value={inputWeight}
-                onChange={(e) => setInputWeight(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-lg font-bold text-white focus:outline-none focus:border-emerald-500"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs font-semibold text-slate-300 block mb-1">Vücut Yağ Oranı (%)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  placeholder="24.5"
-                  value={inputBodyFat}
-                  onChange={(e) => setInputBodyFat(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-300 block mb-1">Bel Çevresi (cm)</label>
-                <input
-                  type="number"
-                  placeholder="78"
-                  value={inputWaist}
-                  onChange={(e) => setInputWaist(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">Not</label>
-              <input
-                type="text"
-                placeholder="Örn. Sabah aç karnına tartıldım"
-                value={inputNote}
-                onChange={(e) => setInputNote(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white"
-              />
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold text-xs"
-              >
-                İptal
-              </button>
-              <button
-                onClick={handleSaveWeight}
-                className="flex-1 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20"
-              >
-                Kaydet
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+  return <div className="space-y-4">
+    <div className="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/40 border border-emerald-500/20 p-5 shadow-xl">
+      <div className="flex items-center justify-between mb-4"><div><span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Kilo ve Vücut Analizi</span><div className="flex items-baseline gap-2"><h2 className="text-3xl font-black text-white">{latestWeight}</h2><span className="text-sm text-slate-400">kg</span></div><p className="text-xs text-slate-300">Başlangıçtan bu yana: <strong className={totalChange<=0?'text-emerald-400':'text-rose-400'}>{totalChange>0?`+${totalChange}`:totalChange} kg</strong></p></div><button onClick={()=>setShowAddModal(true)} className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 font-bold text-xs flex items-center gap-1.5"><Plus className="w-4 h-4"/>Kilo Ekle</button></div>
+      <div className="grid grid-cols-3 gap-2 text-center pt-2 border-t border-slate-800"><div className="p-2 rounded-xl bg-slate-950/60"><span className="text-[10px] text-slate-400 block">Hedef</span><strong className="text-sm text-white">{profile.targetWeightKg} kg</strong><span className="text-[10px] text-emerald-400 block">{remaining>0?`${remaining} kg kaldı`:'Ulaşıldı!'}</span></div><div className="p-2 rounded-xl bg-slate-950/60"><span className="text-[10px] text-slate-400 block">VKİ</span><strong className="text-sm text-white">{bmi}</strong><span className="text-[10px] text-emerald-400 block">{bmiCategory}</span></div><div className="p-2 rounded-xl bg-slate-950/60"><span className="text-[10px] text-slate-400 block">Başlangıç</span><strong className="text-sm text-white">{profile.startingWeightKg} kg</strong><span className="text-[10px] text-slate-400 block">Boy: {profile.heightCm} cm</span></div></div>
     </div>
-  );
+    <div className="rounded-3xl bg-slate-900 border border-slate-800 p-4 space-y-3"><div className="flex items-center justify-between"><div className="flex items-center gap-2"><TrendingDown className="w-4 h-4 text-emerald-400"/><h3 className="text-sm font-bold text-white">Kilo Gelişim Grafiği</h3></div><span className="text-xs text-slate-400">{visible.length}/{weightRecords.length} ölçüm</span></div><div className="flex gap-1.5">{([['7d','7 Gün'],['30d','30 Gün'],['1y','1 Yıl'],['all','Tümü']] as const).map(([k,l])=><button key={k} onClick={()=>setFilter(k)} className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold ${filter===k?'bg-emerald-500 text-slate-950':'bg-slate-800 text-slate-400'}`}>{l}</button>)}</div>{visible.length?<svg viewBox={`0 0 ${chartW} ${chartH}`} className="w-full"><polyline fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" points={line}/>{points.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r="4" fill="#0f172a" stroke="#34d399" strokeWidth="2"/> )}</svg>:<p className="text-center text-xs text-slate-500 py-6">Bu aralıkta ölçüm yok.</p>}</div>
+    <div className="space-y-2"><div className="flex items-center justify-between px-1"><h3 className="text-sm font-bold text-white">Ölçüm Geçmişi</h3><span className="text-[10px] text-slate-500">Kalıcı geçmiş • {weightRecords.length} kayıt</span></div>{[...visible].reverse().map(r=><div key={r.id} className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between"><div className="flex items-center gap-3"><div className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center"><Scale className="w-4 h-4 text-emerald-400"/></div><div><strong className="text-sm font-bold text-white">{r.weightKg} kg</strong><span className="text-xs text-slate-400 block">{fmt(r.timestamp)} {r.note?`• "${r.note}"`:''}</span></div></div><button onClick={()=>onDeleteWeight(r.id)} className="p-1.5 text-slate-500 hover:text-rose-400"><Trash2 className="w-3.5 h-3.5"/></button></div>)}{!visible.length&&<div className="rounded-2xl bg-slate-900 border border-slate-800 p-5 text-center text-xs text-slate-500">Kayıt bulunamadı.</div>}</div>
+    {showAddModal&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"><div className="w-full max-w-sm rounded-3xl bg-slate-900 border border-slate-700 p-6 shadow-2xl space-y-4"><h3 className="text-base font-bold text-white">Yeni Kilo Kaydı Ekle</h3><label className="text-xs font-semibold text-slate-300 block">Tarih *<div className="relative mt-1"><Calendar className="absolute left-3 top-3 w-4 h-4 text-emerald-400"/><input type="date" value={date} onChange={e=>setDate(e.target.value)} className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white"/></div></label><label className="text-xs font-semibold text-slate-300 block">Kilo (kg) *<input type="number" step="0.1" value={weight} onChange={e=>setWeight(e.target.value)} className="mt-1 w-full px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-lg font-bold text-white"/></label><div className="grid grid-cols-2 gap-3"><input type="number" step="0.1" placeholder="Yağ %" value={bodyFat} onChange={e=>setBodyFat(e.target.value)} className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white"/><input type="number" placeholder="Bel cm" value={waist} onChange={e=>setWaist(e.target.value)} className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white"/></div><input type="text" placeholder="Not" value={note} onChange={e=>setNote(e.target.value)} className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 text-sm text-white"/><div className="flex gap-2"><button onClick={()=>setShowAddModal(false)} className="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-300 font-semibold text-xs">İptal</button><button onClick={save} className="flex-1 py-2.5 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs">Kaydet</button></div></div></div>}
+  </div>;
 };
