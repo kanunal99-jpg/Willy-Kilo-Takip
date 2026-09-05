@@ -1,15 +1,15 @@
 {
-  "versionName": "1.0.7",
-  "versionCode": 8,
+  "versionName": "1.0.8",
+  "versionCode": 9,
   "releaseDate": "2026-09-05",
   "minSupportedVersion": "1.0.3",
   "apkUrl": "https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest/download/WillyKiloTakip.apk",
   "githubReleaseUrl": "https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest",
   "releaseNotes": [
-    "Kamera ile gerçek zamanlı barkod tarama aktif edildi",
-    "Android ML Kit barkod tarayıcı ve kamera izin akışı eklendi",
-    "Barkod okutulduğunda ürün sonucu otomatik olarak sorgulanıyor",
-    "Gerçek Gemini AI yemek analizi ve production API bağlantısı korunuyor",
-    "Kalıcı release imzası ile OTA güncelleme zinciri korunuyor"
+    "AI Tara production API bağlantısı native Android için sabitlendi",
+    "AI yemek analizinde gerçek fotoğraf MIME türü korunuyor",
+    "Gemini yemek analizine çoklu model fallback zinciri eklendi",
+    "ML Kit barkod kamera ve kamera izin zinciri korunup manifest metadata tekrarı düzeltildi",
+    "Kalıcı release imzası ve OTA güncelleme zinciri korunuyor"
   ]
 }
