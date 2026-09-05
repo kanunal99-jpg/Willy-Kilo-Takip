@@ -14,10 +14,10 @@ if (!food.includes('const WILLY_API_BASE')) {
   );
 }
 
-// Patch the real multiline fetch safely. Do not depend on formatting from a previous source version.
+// Patch the real multiline fetch safely. Escape the generated template expression so this script does not evaluate it.
 const fetchNeedle = /const res = await fetch\(\s*['"]\/api\/ai\/analyze-food['"]\s*,\s*\{[\s\S]*?\}\s*\);/;
 if (fetchNeedle.test(food)) {
-  food = food.replace(fetchNeedle, `const mimeType = imagePreview?.match(/^data:([^;]+);base64,/)?.[1] || 'image/jpeg';\n      const res = await fetch(\`${WILLY_API_BASE}/api/ai/analyze-food\`, {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },\n        body: JSON.stringify({ imageBase64: imagePreview, mimeType, description: aiPromptNote, mealType: targetMeal })\n      });`);
+  food = food.replace(fetchNeedle, `const mimeType = imagePreview?.match(/^data:([^;]+);base64,/)?.[1] || 'image/jpeg';\n      const res = await fetch(\`\${WILLY_API_BASE}/api/ai/analyze-food\`, {\n        method: 'POST',\n        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },\n        body: JSON.stringify({ imageBase64: imagePreview, mimeType, description: aiPromptNote, mealType: targetMeal })\n      });`);
 } else if (!food.includes('fetch(`${WILLY_API_BASE}/api/ai/analyze-food`')) {
   throw new Error('AI food fetch target not found; refusing unsafe patch');
 }
