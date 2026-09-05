@@ -1,5 +1,4 @@
 import fs from 'node:fs';
-import { parseStringPromise, Builder } from 'xml2js';
 
 const manifestPath = 'android/app/src/main/AndroidManifest.xml';
 
@@ -7,49 +6,49 @@ if (!fs.existsSync(manifestPath)) {
   throw new Error(`AndroidManifest.xml not found at ${manifestPath}`);
 }
 
-const xml = fs.readFileSync(manifestPath, 'utf8');
-const manifest = await parseStringPromise(xml, { explicitArray: true });
-const root = manifest.manifest;
-const androidNs = 'http://schemas.android.com/apk/res/android';
+let xml = fs.readFileSync(manifestPath, 'utf8');
 
-if (!root) throw new Error('Invalid AndroidManifest.xml: missing manifest root');
-
-root.$ ??= {};
-root.$['xmlns:android'] ??= androidNs;
-root['uses-permission'] ??= [];
-root.application ??= [{ $: {} }];
-root.application[0].$ ??= {};
-root.application[0]['meta-data'] ??= [];
-
-const permissions = root['uses-permission'];
-if (!permissions.some((p) => p.$?.['android:name'] === 'android.permission.CAMERA')) {
-  permissions.push({ $: { 'android:name': 'android.permission.CAMERA' } });
+if (!/android:name=["']android\.permission\.CAMERA["']/.test(xml)) {
+  const usesSdk = xml.match(/\s*<uses-sdk\b[^>]*\/?>/);
+  const permission = '    <uses-permission android:name="android.permission.CAMERA" />\n';
+  if (usesSdk?.index !== undefined) {
+    xml = xml.slice(0, usesSdk.index) + permission + xml.slice(usesSdk.index);
+  } else {
+    const manifestEnd = xml.indexOf('>') + 1;
+    xml = xml.slice(0, manifestEnd) + '\n' + permission + xml.slice(manifestEnd);
+  }
 }
 
-const metadata = root.application[0]['meta-data'];
-const barcodeDependency = metadata.find(
-  (m) => m.$?.['android:name'] === 'com.google.mlkit.vision.DEPENDENCIES',
+const dependencyName = 'com.google.mlkit.vision.DEPENDENCIES';
+const metadataRegex = new RegExp(
+  `<meta-data\\b[^>]*android:name=["']${dependencyName.replace(/\./g, '\\.') }["'][^>]*/>`
 );
 
-if (barcodeDependency) {
-  barcodeDependency.$['android:value'] = 'barcode_ui';
-} else {
-  metadata.push({
-    $: {
-      'android:name': 'com.google.mlkit.vision.DEPENDENCIES',
-      'android:value': 'barcode_ui',
-    },
+if (metadataRegex.test(xml)) {
+  xml = xml.replace(metadataRegex, (tag) => {
+    if (/android:value=["']barcode_ui["']/.test(tag)) return tag;
+    if (/android:value=["'][^"']*["']/.test(tag)) {
+      return tag.replace(/android:value=["'][^"']*["']/, 'android:value="barcode_ui"');
+    }
+    return tag.replace(/\s*\/>$/, ' android:value="barcode_ui" />');
   });
+} else {
+  const applicationTag = xml.match(/<application\b[^>]*>/);
+  if (!applicationTag || applicationTag.index === undefined) {
+    throw new Error('Could not locate <application> in AndroidManifest.xml');
+  }
+  const insertAt = applicationTag.index + applicationTag[0].length;
+  const metadata = '\n        <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="barcode_ui" />';
+  xml = xml.slice(0, insertAt) + metadata + xml.slice(insertAt);
 }
 
-const builder = new Builder({ renderOpts: { pretty: true, indent: '   ', newline: '\n' } });
-fs.writeFileSync(manifestPath, builder.buildObject(manifest) + '\n');
+fs.writeFileSync(manifestPath, xml.endsWith('\n') ? xml : xml + '\n');
 
 const finalXml = fs.readFileSync(manifestPath, 'utf8');
-if (!finalXml.includes('android.permission.CAMERA')) {
+if (!/android:name=["']android\.permission\.CAMERA["']/.test(finalXml)) {
   throw new Error('CAMERA permission verification failed');
 }
-if (!finalXml.includes('com.google.mlkit.vision.DEPENDENCIES') || !finalXml.includes('barcode_ui')) {
+if (!finalXml.includes(`android:name="${dependencyName}"`) || !finalXml.includes('android:value="barcode_ui"')) {
   throw new Error('ML Kit barcode_ui metadata verification failed');
 }
 
