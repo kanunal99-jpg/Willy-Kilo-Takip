@@ -36,13 +36,11 @@ jobs:
         run: |
           VERSION=$(node -p "require('./version.json').versionName || '1.0.1'")
           CODE=$(node -p "require('./version.json').versionCode || 2")
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          echo "CODE=$CODE" >> $GITHUB_OUTPUT
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "CODE=$CODE" >> "$GITHUB_OUTPUT"
           echo "Building Willy Kilo Takip version $VERSION (code: $CODE)"
-          if [ -f "android/app/build.gradle" ]; then
-            sed -i "s/versionCode [0-9]\+/versionCode $CODE/" android/app/build.gradle
-            sed -i "s/versionName \"[^\"]*\"/versionName \"$VERSION\"/" android/app/build.gradle
-          fi
+          sed -i "s/versionCode [0-9]\+/versionCode $CODE/" android/app/build.gradle
+          sed -i "s/versionName \"[^\"]*\"/versionName \"$VERSION\"/" android/app/build.gradle
 
       - name: Sync Capacitor
         run: npx cap sync android
@@ -53,15 +51,56 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Build debug APK
+      # Production updates require a persistent signing identity. The keystore is
+      # supplied through GitHub Actions secrets and is never committed to the repo.
+      - name: Validate release signing configuration
+        env:
+          KEYSTORE_B64: ${{ secrets.WILLY_RELEASE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.WILLY_RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.WILLY_RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.WILLY_RELEASE_KEY_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_B64" || { echo "Missing WILLY_RELEASE_KEYSTORE_BASE64"; exit 1; }
+          test -n "$KEYSTORE_PASSWORD" || { echo "Missing WILLY_RELEASE_KEYSTORE_PASSWORD"; exit 1; }
+          test -n "$KEY_ALIAS" || { echo "Missing WILLY_RELEASE_KEY_ALIAS"; exit 1; }
+          test -n "$KEY_PASSWORD" || { echo "Missing WILLY_RELEASE_KEY_PASSWORD"; exit 1; }
+
+      - name: Configure release signing
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
+        env:
+          KEYSTORE_B64: ${{ secrets.WILLY_RELEASE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.WILLY_RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.WILLY_RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.WILLY_RELEASE_KEY_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 --decode > willy-release.jks
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/build.gradle')
+          s = p.read_text()
+          signing = '''\n    signingConfigs {\n        release {\n            storeFile file("../willy-release.jks")\n            storePassword System.getenv("KEYSTORE_PASSWORD")\n            keyAlias System.getenv("KEY_ALIAS")\n            keyPassword System.getenv("KEY_PASSWORD")\n        }\n    }\n'''
+          if 'signingConfigs {' not in s:
+              s = s.replace('android {', 'android {' + signing, 1)
+          if 'signingConfig signingConfigs.release' not in s:
+              s = s.replace('buildTypes {', 'buildTypes {', 1)
+              s = s.replace('release {', 'release {\n            signingConfig signingConfigs.release', 1)
+          p.write_text(s)
+          PY
+
+      - name: Build signed release APK
+        working-directory: android
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.WILLY_RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.WILLY_RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.WILLY_RELEASE_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --no-daemon
 
       - name: Prepare APK outputs
         run: |
           mkdir -p release-assets
-          cp android/app/build/outputs/apk/debug/app-debug.apk release-assets/WillyKiloTakip.apk
-          cp android/app/build/outputs/apk/debug/app-debug.apk release-assets/WillyKiloTakip-v${{ steps.version.outputs.VERSION }}.apk
+          cp android/app/build/outputs/apk/release/app-release.apk release-assets/WillyKiloTakip.apk
+          cp android/app/build/outputs/apk/release/app-release.apk release-assets/WillyKiloTakip-v${{ steps.version.outputs.VERSION }}.apk
+          rm -f android/willy-release.jks
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
@@ -78,13 +117,14 @@ jobs:
           name: Willy Kilo Takip v${{ steps.version.outputs.VERSION }}
           body: |
             ## 🐾 Willy Kilo Takip v${{ steps.version.outputs.VERSION }}
-            
+
             ### ✨ Yenilikler ve Güncellemeler:
-            - 🤖 **Gerçek Gemini AI Willy Koç & Yemek Analizi**
-            - 🔄 **Canlı OTA Güncelleme Sistemi**
-            - 📱 **PWA & Offline-First**
-            - ⚡ **TypeScript doğrulaması ve performans iyileştirmeleri**
-            
+            - 🤖 Gerçek Gemini AI Willy Koç & Yemek Analizi
+            - 🔄 Canlı OTA Güncelleme Sistemi
+            - 📱 PWA & Offline-First
+            - 🔐 Kalıcı release imzası ile güvenli Android güncelleme zinciri
+            - ⚡ TypeScript doğrulaması ve performans iyileştirmeleri
+
             **İndirme:** `WillyKiloTakip.apk`
           files: |
             release-assets/WillyKiloTakip.apk
