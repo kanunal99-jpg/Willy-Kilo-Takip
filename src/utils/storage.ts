@@ -13,10 +13,25 @@ export const getTodayKey = (date: Date = new Date()): string => {
   return `${y}-${m}-${d}`;
 };
 
+const generateSyncKey = (): string => {
+  const bytes = new Uint8Array(16);
+  if (globalThis.crypto?.getRandomValues) globalThis.crypto.getRandomValues(bytes);
+  else for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+  return `WILLY-${Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+};
+
 export const loadUserProfile = (): UserProfile => {
-  try { const raw = localStorage.getItem(STORAGE_KEYS.PROFILE); if (raw) return JSON.parse(raw); } catch (e) { console.error('Failed to load profile:', e); }
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.PROFILE);
+    if (raw) {
+      const profile = JSON.parse(raw) as UserProfile;
+      // Keep existing sync keys working; all newly created profiles receive high-entropy keys.
+      if (!profile.cloudSyncKey) profile.cloudSyncKey = generateSyncKey();
+      return profile;
+    }
+  } catch (e) { console.error('Failed to load profile:', e); }
   const generatedId = globalThis.crypto?.randomUUID?.() || `user-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  return { ...INITIAL_USER_PROFILE, id: generatedId, cloudSyncKey: `WILLY-${Math.floor(100000 + Math.random() * 900000)}`, diamonds: 0, streakDays: 0 };
+  return { ...INITIAL_USER_PROFILE, id: generatedId, cloudSyncKey: generateSyncKey(), diamonds: 0, streakDays: 0 };
 };
 export const saveUserProfile = (profile: UserProfile): void => { try { localStorage.setItem(STORAGE_KEYS.PROFILE, JSON.stringify(profile)); } catch (e) { console.error('Failed to save profile:', e); } };
 
