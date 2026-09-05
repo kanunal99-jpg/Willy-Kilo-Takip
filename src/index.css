@@ -11,3 +11,8 @@
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
 }
 
+/* Capacitor ML Kit renders the native camera behind the WebView during startScan(). */
+body.barcode-scanner-active {
+  visibility: hidden;
+  background: transparent !important;
+}
