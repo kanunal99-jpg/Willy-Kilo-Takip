@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Flame, Diamond, Cloud, ChevronLeft, ChevronRight, Settings, Smartphone, Award, User, RefreshCw } from 'lucide-react';
+import { Flame, Diamond, Cloud, ChevronLeft, ChevronRight, Settings, Smartphone, Award, User, RefreshCw, Package } from 'lucide-react';
 import { UserProfile } from '../types';
 import { PWAInstallButton } from './PWAInstallButton';
 
@@ -11,6 +11,7 @@ interface HeaderProps {
   onToday: () => void;
   onOpenSyncModal: () => void;
   onOpenProfileModal: () => void;
+  onOpenApkModal: () => void;
   isSyncing?: boolean;
 }
 
@@ -22,6 +23,7 @@ export const Header: React.FC<HeaderProps> = ({
   onToday,
   onOpenSyncModal,
   onOpenProfileModal,
+  onOpenApkModal,
   isSyncing,
 }) => {
   return (
@@ -63,7 +65,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Right: Date, Cloud & PWA install */}
+        {/* Right: Date, Cloud & PWA/APK install */}
         <div className="flex items-center gap-2">
           {/* Cloud sync button */}
           <button
@@ -75,8 +77,16 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="hidden sm:inline">Bulut</span>
           </button>
 
-          {/* PWA / APK install */}
-          <PWAInstallButton variant="badge" />
+          {/* APK Export & Install button */}
+          <button
+            onClick={onOpenApkModal}
+            id="btn-header-apk-export"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-bold text-xs shadow-md shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer"
+            title="APK İndir / Telefona Yükle"
+          >
+            <Package className="w-3.5 h-3.5" />
+            <span>APK İndir</span>
+          </button>
 
           {/* Profile settings button */}
           <button

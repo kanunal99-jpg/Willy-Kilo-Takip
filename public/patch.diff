@@ -1,0 +1,3687 @@
+From d5d87b840fc998ce1cea47a0bae27a697fbb160b Mon Sep 17 00:00:00 2001
+From: kanunal99-jpg <kanunal99@gmail.com>
+Date: Sat, 5 Sep 2026 13:36:30 +0000
+Subject: [PATCH] fix(production): resolve Render crash, dynamic port binding,
+ and sync conflicts
+
+---
+ README.md                           |  101 ++
+ capacitor.config.ts                 |    1 -
+ data/cloud_sync_db.json             |  168 ++
+ index.html                          |    2 +-
+ package.json                        |   12 +-
+ public/manifest.json                |   45 +
+ public/manifest.webmanifest         |   33 +
+ public/patch.diff                   | 2461 +++++++++++++++++++++++++++
+ public/sw.js                        |   56 +
+ server.ts                           |    7 +-
+ src/App.tsx                         |    9 +
+ src/components/ApkExportModal.tsx   |  389 +++++
+ src/components/Header.tsx           |   18 +-
+ src/components/PWAInstallButton.tsx |  104 +-
+ src/main.tsx                        |    8 +
+ 15 files changed, 3307 insertions(+), 107 deletions(-)
+ create mode 100644 README.md
+ create mode 100644 public/manifest.json
+ create mode 100644 public/manifest.webmanifest
+ create mode 100644 public/patch.diff
+ create mode 100644 public/sw.js
+ create mode 100644 src/components/ApkExportModal.tsx
+
+diff --git a/README.md b/README.md
+new file mode 100644
+index 0000000..a9b4b72
+--- /dev/null
++++ b/README.md
+@@ -0,0 +1,101 @@
++# Willy Kilo Takip 🍏🏋️
++
++Willy Kilo Takip; modern React 19, TypeScript, Tailwind CSS ve Node.js Express ile geliştirilmiş, aralıklı oruç takipçisi, yapay zeka destekli yemek analizi ve kalori günlüğü uygulamasıdır.
++
++---
++
++## 💻 Terminal Kurulum Adımları (Geliştirme Ortamı)
++
++### 1. Gereksinimler
++- **Node.js**: v18.0.0 veya üzeri (`node -v` ile kontrol edebilirsiniz)
++- **npm**: v9.0.0 veya üzeri (`npm -v`)
++
++### 2. Bağımlılıkları Yükleme
++Terminalinizi açıp proje klasörüne gidin ve paketleri kurun:
++```bash
++npm install
++```
++
++### 3. Ortam Değişkeni (.env) Ayarı (Opsiyonel)
++Yapay Zeka (Gemini) beslenme koçu ve fotoğraf tarama özelliklerini aktifleştirmek için `.env.example` dosyasını `.env` olarak kopyalayın:
++```bash
++cp .env.example .env
++```
++Ardından `.env` dosyasını açıp Google AI Studio API anahtarınızı ekleyin:
++```env
++GEMINI_API_KEY=your_gemini_api_key_here
++```
++
++### 4. Geliştirme Sunucusunu Başlatma
++```bash
++npm run dev
++```
++Sunucu başladığında tarayıcınızda şu adresi açın:
++👉 **`http://localhost:3000`**
++
++---
++
++## 🚀 Üretim (Production) Derlemesi ve Çalıştırma
++
++Projeyi canlı sunucuda veya Docker/Cloud Run konteynerinde çalıştırmak için:
++
++```bash
++# 1. Frontend ve Backend'i tek komutla derleyin:
++npm run build
++
++# 2. Üretim sunucusunu başlatın:
++npm start
++```
++
++---
++
++## 📱 Terminalden Doğrudan Android APK Üretme
++
++### Yöntem A: Google Bubblewrap CLI (En Hızlı)
++Android Studio kurmadan doğrudan terminal üzerinden imzalı `.apk` dosyası üretmek için:
++
++```bash
++# 1. Bubblewrap CLI aracını küresel olarak yükleyin:
++npm install -g @bubblewrap/cli
++
++# 2. Canlı uygulamanızın manifest dosyasıyla projeyi oluşturun:
++bubblewrap init --manifest="https://ais-dev-dvnvts6sqeqpm2rx53m2ma-627591680405.europe-west2.run.app/manifest.webmanifest"
++
++# 3. İmzalı APK'yı derleyin:
++bubblewrap build
++```
++Bu işlem sonunda bulunduğunuz dizinde doğrudan Android cihazlara yüklenebilir `app-release-signed.apk` dosyası oluşur.
++
++---
++
++### Yöntem B: Capacitor & Android Studio ile APK Derleme
++
++```bash
++# 1. Capacitor paketlerini yükleyin:
++npm install @capacitor/core @capacitor/cli @capacitor/android
++
++# 2. Capacitor'ı başlatın:
++npx cap init "Willy Kilo Takip" com.willy.kilotakip --web-dir dist
++
++# 3. Android platform klasörünü ekleyin:
++npx cap add android
++
++# 4. Projeyi derleyip Android'e aktarın:
++npm run build
++npx cap sync android
++
++# 5. Android Studio'yu açıp APK üretin:
++npx cap open android
++```
++Android Studio açıldığında menüden **Build > Build Bundle(s) / APK(s) > Build APK(s)** seçeneğine basarak APK dosyanızı elde edebilirsiniz.
++
++---
++
++## 🛠️ Komut Özeti
++
++| Komut | Açıklama |
++|---|---|
++| `npm run dev` | Geliştirme sunucusunu başlatır (Vite + Express) |
++| `npm run build` | Hem frontend hem sunucu kodunu `dist/` klasörüne derler |
++| `npm start` | Derlenmiş üretim sunucusunu çalıştırır |
++| `npm run lint` | TypeScript tip kontrollerini gerçekleştirir |
+diff --git a/capacitor.config.ts b/capacitor.config.ts
+index 81acf7e..33ffc41 100644
+--- a/capacitor.config.ts
++++ b/capacitor.config.ts
+@@ -4,7 +4,6 @@ const config: CapacitorConfig = {
+   appId: 'com.willy.kilotakip',
+   appName: 'Willy Kilo Takip',
+   webDir: 'dist',
+-  bundledWebRuntime: false,
+   server: {
+     androidScheme: 'https'
+   }
+diff --git a/data/cloud_sync_db.json b/data/cloud_sync_db.json
+index 164f339..45afbe2 100644
+--- a/data/cloud_sync_db.json
++++ b/data/cloud_sync_db.json
+@@ -8,5 +8,173 @@
+     "fastingHistory": [],
+     "weightRecords": [],
+     "customRecipes": []
++  },
++  "WILLY-823902": {
++    "lastUpdated": 1788615120582,
++    "profile": {
++      "id": "willy-user-default",
++      "name": "Willy Dostu",
++      "gender": "female",
++      "age": 28,
++      "heightCm": 168,
++      "currentWeightKg": 68.5,
++      "startingWeightKg": 75,
++      "targetWeightKg": 60,
++      "goal": "lose_weight",
++      "activityLevel": "moderate",
++      "dailyCalorieTarget": 1650,
++      "macroTargets": {
++        "carbs": 165,
++        "protein": 105,
++        "fat": 55
++      },
++      "waterTargetMl": 2250,
++      "fastingPlan": "16:8",
++      "cloudSyncKey": "WILLY-823902",
++      "diamonds": 2450,
++      "streakDays": 14
++    },
++    "dailyLogs": {
++      "2026-09-05": {
++        "date": "2026-09-05",
++        "entries": [
++          {
++            "id": "init-1",
++            "name": "Haşlanmış Yumurta (2 Adet)",
++            "mealType": "breakfast",
++            "servingAmount": 2,
++            "servingUnit": "adet",
++            "calories": 156,
++            "carbs": 1.2,
++            "protein": 12.6,
++            "fat": 10.6,
++            "fiber": 0,
++            "healthScore": 95,
++            "pros": [
++              "İyi protein kaynağı",
++              "Sıfır şeker"
++            ],
++            "timestamp": 1788593512676
++          },
++          {
++            "id": "init-2",
++            "name": "Beyaz Peynir & Yeşillik",
++            "mealType": "breakfast",
++            "servingAmount": 40,
++            "servingUnit": "gram",
++            "calories": 124,
++            "carbs": 1.5,
++            "protein": 8.5,
++            "fat": 9.6,
++            "fiber": 1.2,
++            "healthScore": 88,
++            "pros": [
++              "Kalsiyum deposu"
++            ],
++            "timestamp": 1788593872676
++          },
++          {
++            "id": "init-3",
++            "name": "Izgara Tavuklu Kinoa Salatası",
++            "mealType": "lunch",
++            "servingAmount": 1,
++            "servingUnit": "porsiyon",
++            "calories": 460,
++            "carbs": 38,
++            "protein": 42,
++            "fat": 14,
++            "fiber": 6.5,
++            "healthScore": 98,
++            "pros": [
++              "Yüksek protein",
++              "Kompleks karbonhidrat"
++            ],
++            "timestamp": 1788604312676
++          }
++        ],
++        "waterIntakeMl": 1750,
++        "steps": 6420,
++        "exercises": [
++          {
++            "id": "ex-1",
++            "title": "Tempolu Yürüyüş",
++            "durationMinutes": 35,
++            "caloriesBurned": 185,
++            "steps": 4200,
++            "timestamp": 1788600712676
++          }
++        ],
++        "notes": "Enerjim bugün çok yüksekti!"
++      }
++    },
++    "fastingHistory": [
++      {
++        "id": "fh-1",
++        "plan": "16:8",
++        "startTime": 1788291112676,
++        "endTime": 1788348712676,
++        "targetDurationHours": 16,
++        "completed": true
++      },
++      {
++        "id": "fh-2",
++        "plan": "16:8",
++        "startTime": 1788375712676,
++        "endTime": 1788435112676,
++        "targetDurationHours": 16,
++        "completed": true
++      },
++      {
++        "id": "fh-3",
++        "plan": "16:8",
++        "startTime": 1788463912676,
++        "endTime": 1788521512676,
++        "targetDurationHours": 16,
++        "completed": true
++      }
++    ],
++    "weightRecords": [
++      {
++        "id": "w-1",
++        "date": "14 Gün Önce",
++        "weightKg": 72,
++        "bodyFat": 26.5,
++        "waistCm": 82,
++        "timestamp": 1787398312676
++      },
++      {
++        "id": "w-2",
++        "date": "10 Gün Önce",
++        "weightKg": 71.2,
++        "bodyFat": 26,
++        "waistCm": 81,
++        "timestamp": 1787743912676
++      },
++      {
++        "id": "w-3",
++        "date": "7 Gün Önce",
++        "weightKg": 70.4,
++        "bodyFat": 25.4,
++        "waistCm": 80,
++        "timestamp": 1788003112676
++      },
++      {
++        "id": "w-4",
++        "date": "3 Gün Önce",
++        "weightKg": 69.3,
++        "bodyFat": 24.8,
++        "waistCm": 79,
++        "timestamp": 1788348712676
++      },
++      {
++        "id": "w-5",
++        "date": "Bugün",
++        "weightKg": 68.5,
++        "bodyFat": 24.2,
++        "waistCm": 78,
++        "timestamp": 1788607912676
++      }
++    ],
++    "customRecipes": []
+   }
+ }
+\ No newline at end of file
+diff --git a/index.html b/index.html
+index ee9bfe1..a469dbb 100644
+--- a/index.html
++++ b/index.html
+@@ -18,7 +18,7 @@
+     <meta name="apple-mobile-web-app-title" content="Willy Takip" />
+     <link rel="apple-touch-icon" href="/pwa-192x192.png" />
+     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+-    <link rel="manifest" href="/manifest.webmanifest" />
++    <link rel="manifest" href="/manifest.json" />
+ 
+     <!-- Google Fonts for sleek modern typography -->
+     <link rel="preconnect" href="https://fonts.googleapis.com" />
+diff --git a/package.json b/package.json
+index a20e2fb..2c99bb4 100644
+--- a/package.json
++++ b/package.json
+@@ -17,23 +17,23 @@
+     "@google/genai": "^2.4.0",
+     "@tailwindcss/vite": "^4.1.14",
+     "@vitejs/plugin-react": "^5.0.4",
++    "dotenv": "^17.2.3",
++    "esbuild": "^0.25.0",
++    "express": "^4.21.2",
+     "lucide-react": "^0.546.0",
++    "motion": "^12.23.24",
+     "react": "^19.0.1",
+     "react-dom": "^19.0.1",
+     "vite": "^6.2.3",
+-    "express": "^4.21.2",
+-    "dotenv": "^17.2.3",
+-    "motion": "^12.23.24"
++    "vite-plugin-pwa": "^1.3.0"
+   },
+   "devDependencies": {
+     "@capacitor/cli": "^7.4.3",
+     "@types/express": "^4.17.21",
+     "@types/node": "^22.14.0",
+     "autoprefixer": "^10.4.21",
+-    "esbuild": "^0.25.0",
+     "tailwindcss": "^4.1.14",
+     "tsx": "^4.21.0",
+-    "typescript": "~5.8.2",
+-    "vite-plugin-pwa": "^1.3.0"
++    "typescript": "~5.8.2"
+   }
+ }
+diff --git a/public/manifest.json b/public/manifest.json
+new file mode 100644
+index 0000000..fb12ae0
+--- /dev/null
++++ b/public/manifest.json
+@@ -0,0 +1,45 @@
++{
++  "id": "/",
++  "name": "Willy Kilo Takip - AI Kalori ve Diyet",
++  "short_name": "Willy Kilo",
++  "description": "Yazio benzeri AI kalori sayacı, aralıklı oruç, su takibi ve kilo takip uygulaması.",
++  "start_url": "/",
++  "scope": "/",
++  "display": "standalone",
++  "orientation": "portrait",
++  "background_color": "#020617",
++  "theme_color": "#0f172a",
++  "categories": ["health", "fitness", "lifestyle"],
++  "icons": [
++    {
++      "src": "/pwa-192x192.png",
++      "sizes": "192x192",
++      "type": "image/png",
++      "purpose": "any"
++    },
++    {
++      "src": "/pwa-512x512.png",
++      "sizes": "512x512",
++      "type": "image/png",
++      "purpose": "any"
++    },
++    {
++      "src": "/pwa-512x512.png",
++      "sizes": "512x512",
++      "type": "image/png",
++      "purpose": "maskable"
++    }
++  ],
++  "shortcuts": [
++    {
++      "name": "Yemek Ekle",
++      "url": "/?action=add-meal",
++      "description": "Hızlı kalori ve yemek kaydet"
++    },
++    {
++      "name": "Oruç Başlat",
++      "url": "/?action=fasting",
++      "description": "Aralıklı oruç sayacı"
++    }
++  ]
++}
+diff --git a/public/manifest.webmanifest b/public/manifest.webmanifest
+new file mode 100644
+index 0000000..61f0d4f
+--- /dev/null
++++ b/public/manifest.webmanifest
+@@ -0,0 +1,33 @@
++{
++  "id": "/",
++  "name": "Willy Kilo Takip - AI Kalori ve Diyet",
++  "short_name": "Willy Kilo",
++  "description": "Yazio benzeri AI kalori sayacı, aralıklı oruç, su takibi ve kilo takip uygulaması.",
++  "start_url": "/",
++  "scope": "/",
++  "display": "standalone",
++  "orientation": "portrait",
++  "background_color": "#020617",
++  "theme_color": "#0f172a",
++  "categories": ["health", "fitness", "lifestyle"],
++  "icons": [
++    {
++      "src": "/pwa-192x192.png",
++      "sizes": "192x192",
++      "type": "image/png",
++      "purpose": "any"
++    },
++    {
++      "src": "/pwa-512x512.png",
++      "sizes": "512x512",
++      "type": "image/png",
++      "purpose": "any"
++    },
++    {
++      "src": "/pwa-512x512.png",
++      "sizes": "512x512",
++      "type": "image/png",
++      "purpose": "maskable"
++    }
++  ]
++}
+diff --git a/public/patch.diff b/public/patch.diff
+new file mode 100644
+index 0000000..bda6b56
+--- /dev/null
++++ b/public/patch.diff
+@@ -0,0 +1,2461 @@
++From 445ad9da89cfe21015a8d850b4208915296a61a8 Mon Sep 17 00:00:00 2001
++From: kanunal99-jpg <kanunal99@gmail.com>
++Date: Sat, 5 Sep 2026 13:25:42 +0000
++Subject: [PATCH] fix(production): resolve Render crash, dynamic port binding,
++ and add PWA assets
++
++---
++ README.md                           |  101 +++
++ capacitor.config.ts                 |   11 +-
++ data/cloud_sync_db.json             |  168 ++++
++ index.html                          |    2 +-
++ package.json                        |   22 +-
++ public/manifest.json                |   45 +
++ public/manifest.webmanifest         |   33 +
++ public/patch.diff                   | 1214 +++++++++++++++++++++++++++
++ public/sw.js                        |   56 ++
++ server.ts                           |    7 +-
++ src/App.tsx                         |    9 +
++ src/components/ApkExportModal.tsx   |  389 +++++++++
++ src/components/Header.tsx           |   18 +-
++ src/components/PWAInstallButton.tsx |  104 +--
++ src/main.tsx                        |    8 +
++ 15 files changed, 2074 insertions(+), 113 deletions(-)
++ create mode 100644 README.md
++ create mode 100644 public/manifest.json
++ create mode 100644 public/manifest.webmanifest
++ create mode 100644 public/patch.diff
++ create mode 100644 public/sw.js
++ create mode 100644 src/components/ApkExportModal.tsx
++
++diff --git a/README.md b/README.md
++new file mode 100644
++index 0000000..a9b4b72
++--- /dev/null
+++++ b/README.md
++@@ -0,0 +1,101 @@
+++# Willy Kilo Takip 🍏🏋️
+++
+++Willy Kilo Takip; modern React 19, TypeScript, Tailwind CSS ve Node.js Express ile geliştirilmiş, aralıklı oruç takipçisi, yapay zeka destekli yemek analizi ve kalori günlüğü uygulamasıdır.
+++
+++---
+++
+++## 💻 Terminal Kurulum Adımları (Geliştirme Ortamı)
+++
+++### 1. Gereksinimler
+++- **Node.js**: v18.0.0 veya üzeri (`node -v` ile kontrol edebilirsiniz)
+++- **npm**: v9.0.0 veya üzeri (`npm -v`)
+++
+++### 2. Bağımlılıkları Yükleme
+++Terminalinizi açıp proje klasörüne gidin ve paketleri kurun:
+++```bash
+++npm install
+++```
+++
+++### 3. Ortam Değişkeni (.env) Ayarı (Opsiyonel)
+++Yapay Zeka (Gemini) beslenme koçu ve fotoğraf tarama özelliklerini aktifleştirmek için `.env.example` dosyasını `.env` olarak kopyalayın:
+++```bash
+++cp .env.example .env
+++```
+++Ardından `.env` dosyasını açıp Google AI Studio API anahtarınızı ekleyin:
+++```env
+++GEMINI_API_KEY=your_gemini_api_key_here
+++```
+++
+++### 4. Geliştirme Sunucusunu Başlatma
+++```bash
+++npm run dev
+++```
+++Sunucu başladığında tarayıcınızda şu adresi açın:
+++👉 **`http://localhost:3000`**
+++
+++---
+++
+++## 🚀 Üretim (Production) Derlemesi ve Çalıştırma
+++
+++Projeyi canlı sunucuda veya Docker/Cloud Run konteynerinde çalıştırmak için:
+++
+++```bash
+++# 1. Frontend ve Backend'i tek komutla derleyin:
+++npm run build
+++
+++# 2. Üretim sunucusunu başlatın:
+++npm start
+++```
+++
+++---
+++
+++## 📱 Terminalden Doğrudan Android APK Üretme
+++
+++### Yöntem A: Google Bubblewrap CLI (En Hızlı)
+++Android Studio kurmadan doğrudan terminal üzerinden imzalı `.apk` dosyası üretmek için:
+++
+++```bash
+++# 1. Bubblewrap CLI aracını küresel olarak yükleyin:
+++npm install -g @bubblewrap/cli
+++
+++# 2. Canlı uygulamanızın manifest dosyasıyla projeyi oluşturun:
+++bubblewrap init --manifest="https://ais-dev-dvnvts6sqeqpm2rx53m2ma-627591680405.europe-west2.run.app/manifest.webmanifest"
+++
+++# 3. İmzalı APK'yı derleyin:
+++bubblewrap build
+++```
+++Bu işlem sonunda bulunduğunuz dizinde doğrudan Android cihazlara yüklenebilir `app-release-signed.apk` dosyası oluşur.
+++
+++---
+++
+++### Yöntem B: Capacitor & Android Studio ile APK Derleme
+++
+++```bash
+++# 1. Capacitor paketlerini yükleyin:
+++npm install @capacitor/core @capacitor/cli @capacitor/android
+++
+++# 2. Capacitor'ı başlatın:
+++npx cap init "Willy Kilo Takip" com.willy.kilotakip --web-dir dist
+++
+++# 3. Android platform klasörünü ekleyin:
+++npx cap add android
+++
+++# 4. Projeyi derleyip Android'e aktarın:
+++npm run build
+++npx cap sync android
+++
+++# 5. Android Studio'yu açıp APK üretin:
+++npx cap open android
+++```
+++Android Studio açıldığında menüden **Build > Build Bundle(s) / APK(s) > Build APK(s)** seçeneğine basarak APK dosyanızı elde edebilirsiniz.
+++
+++---
+++
+++## 🛠️ Komut Özeti
+++
+++| Komut | Açıklama |
+++|---|---|
+++| `npm run dev` | Geliştirme sunucusunu başlatır (Vite + Express) |
+++| `npm run build` | Hem frontend hem sunucu kodunu `dist/` klasörüne derler |
+++| `npm start` | Derlenmiş üretim sunucusunu çalıştırır |
+++| `npm run lint` | TypeScript tip kontrollerini gerçekleştirir |
++diff --git a/capacitor.config.ts b/capacitor.config.ts
++index 81acf7e..0605442 100644
++--- a/capacitor.config.ts
+++++ b/capacitor.config.ts
++@@ -1,10 +1,17 @@
++-import type { CapacitorConfig } from '@capacitor/cli';
+++export interface CapacitorConfig {
+++  appId: string;
+++  appName: string;
+++  webDir: string;
+++  bundledWebRuntime?: boolean;
+++  server?: {
+++    androidScheme?: string;
+++  };
+++}
++ 
++ const config: CapacitorConfig = {
++   appId: 'com.willy.kilotakip',
++   appName: 'Willy Kilo Takip',
++   webDir: 'dist',
++-  bundledWebRuntime: false,
++   server: {
++     androidScheme: 'https'
++   }
++diff --git a/data/cloud_sync_db.json b/data/cloud_sync_db.json
++index 164f339..a4a5715 100644
++--- a/data/cloud_sync_db.json
+++++ b/data/cloud_sync_db.json
++@@ -8,5 +8,173 @@
++     "fastingHistory": [],
++     "weightRecords": [],
++     "customRecipes": []
+++  },
+++  "WILLY-823902": {
+++    "lastUpdated": 1788614702913,
+++    "profile": {
+++      "id": "willy-user-default",
+++      "name": "Willy Dostu",
+++      "gender": "female",
+++      "age": 28,
+++      "heightCm": 168,
+++      "currentWeightKg": 68.5,
+++      "startingWeightKg": 75,
+++      "targetWeightKg": 60,
+++      "goal": "lose_weight",
+++      "activityLevel": "moderate",
+++      "dailyCalorieTarget": 1650,
+++      "macroTargets": {
+++        "carbs": 165,
+++        "protein": 105,
+++        "fat": 55
+++      },
+++      "waterTargetMl": 2250,
+++      "fastingPlan": "16:8",
+++      "cloudSyncKey": "WILLY-823902",
+++      "diamonds": 2450,
+++      "streakDays": 14
+++    },
+++    "dailyLogs": {
+++      "2026-09-05": {
+++        "date": "2026-09-05",
+++        "entries": [
+++          {
+++            "id": "init-1",
+++            "name": "Haşlanmış Yumurta (2 Adet)",
+++            "mealType": "breakfast",
+++            "servingAmount": 2,
+++            "servingUnit": "adet",
+++            "calories": 156,
+++            "carbs": 1.2,
+++            "protein": 12.6,
+++            "fat": 10.6,
+++            "fiber": 0,
+++            "healthScore": 95,
+++            "pros": [
+++              "İyi protein kaynağı",
+++              "Sıfır şeker"
+++            ],
+++            "timestamp": 1788593512676
+++          },
+++          {
+++            "id": "init-2",
+++            "name": "Beyaz Peynir & Yeşillik",
+++            "mealType": "breakfast",
+++            "servingAmount": 40,
+++            "servingUnit": "gram",
+++            "calories": 124,
+++            "carbs": 1.5,
+++            "protein": 8.5,
+++            "fat": 9.6,
+++            "fiber": 1.2,
+++            "healthScore": 88,
+++            "pros": [
+++              "Kalsiyum deposu"
+++            ],
+++            "timestamp": 1788593872676
+++          },
+++          {
+++            "id": "init-3",
+++            "name": "Izgara Tavuklu Kinoa Salatası",
+++            "mealType": "lunch",
+++            "servingAmount": 1,
+++            "servingUnit": "porsiyon",
+++            "calories": 460,
+++            "carbs": 38,
+++            "protein": 42,
+++            "fat": 14,
+++            "fiber": 6.5,
+++            "healthScore": 98,
+++            "pros": [
+++              "Yüksek protein",
+++              "Kompleks karbonhidrat"
+++            ],
+++            "timestamp": 1788604312676
+++          }
+++        ],
+++        "waterIntakeMl": 1750,
+++        "steps": 6420,
+++        "exercises": [
+++          {
+++            "id": "ex-1",
+++            "title": "Tempolu Yürüyüş",
+++            "durationMinutes": 35,
+++            "caloriesBurned": 185,
+++            "steps": 4200,
+++            "timestamp": 1788600712676
+++          }
+++        ],
+++        "notes": "Enerjim bugün çok yüksekti!"
+++      }
+++    },
+++    "fastingHistory": [
+++      {
+++        "id": "fh-1",
+++        "plan": "16:8",
+++        "startTime": 1788291112676,
+++        "endTime": 1788348712676,
+++        "targetDurationHours": 16,
+++        "completed": true
+++      },
+++      {
+++        "id": "fh-2",
+++        "plan": "16:8",
+++        "startTime": 1788375712676,
+++        "endTime": 1788435112676,
+++        "targetDurationHours": 16,
+++        "completed": true
+++      },
+++      {
+++        "id": "fh-3",
+++        "plan": "16:8",
+++        "startTime": 1788463912676,
+++        "endTime": 1788521512676,
+++        "targetDurationHours": 16,
+++        "completed": true
+++      }
+++    ],
+++    "weightRecords": [
+++      {
+++        "id": "w-1",
+++        "date": "14 Gün Önce",
+++        "weightKg": 72,
+++        "bodyFat": 26.5,
+++        "waistCm": 82,
+++        "timestamp": 1787398312676
+++      },
+++      {
+++        "id": "w-2",
+++        "date": "10 Gün Önce",
+++        "weightKg": 71.2,
+++        "bodyFat": 26,
+++        "waistCm": 81,
+++        "timestamp": 1787743912676
+++      },
+++      {
+++        "id": "w-3",
+++        "date": "7 Gün Önce",
+++        "weightKg": 70.4,
+++        "bodyFat": 25.4,
+++        "waistCm": 80,
+++        "timestamp": 1788003112676
+++      },
+++      {
+++        "id": "w-4",
+++        "date": "3 Gün Önce",
+++        "weightKg": 69.3,
+++        "bodyFat": 24.8,
+++        "waistCm": 79,
+++        "timestamp": 1788348712676
+++      },
+++      {
+++        "id": "w-5",
+++        "date": "Bugün",
+++        "weightKg": 68.5,
+++        "bodyFat": 24.2,
+++        "waistCm": 78,
+++        "timestamp": 1788607912676
+++      }
+++    ],
+++    "customRecipes": []
++   }
++ }
++\ No newline at end of file
++diff --git a/index.html b/index.html
++index ee9bfe1..a469dbb 100644
++--- a/index.html
+++++ b/index.html
++@@ -18,7 +18,7 @@
++     <meta name="apple-mobile-web-app-title" content="Willy Takip" />
++     <link rel="apple-touch-icon" href="/pwa-192x192.png" />
++     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
++-    <link rel="manifest" href="/manifest.webmanifest" />
+++    <link rel="manifest" href="/manifest.json" />
++ 
++     <!-- Google Fonts for sleek modern typography -->
++     <link rel="preconnect" href="https://fonts.googleapis.com" />
++diff --git a/package.json b/package.json
++index a20e2fb..5b632d6 100644
++--- a/package.json
+++++ b/package.json
++@@ -13,27 +13,27 @@
++   },
++   "dependencies": {
++     "@capacitor/android": "^7.4.3",
+++    "@capacitor/cli": "^7.4.3",
++     "@capacitor/core": "^7.4.3",
++     "@google/genai": "^2.4.0",
++     "@tailwindcss/vite": "^4.1.14",
+++    "@types/express": "^4.17.21",
+++    "@types/node": "^22.14.0",
++     "@vitejs/plugin-react": "^5.0.4",
+++    "dotenv": "^17.2.3",
+++    "esbuild": "^0.25.0",
+++    "express": "^4.21.2",
++     "lucide-react": "^0.546.0",
+++    "motion": "^12.23.24",
++     "react": "^19.0.1",
++     "react-dom": "^19.0.1",
++-    "vite": "^6.2.3",
++-    "express": "^4.21.2",
++-    "dotenv": "^17.2.3",
++-    "motion": "^12.23.24"
++-  },
++-  "devDependencies": {
++-    "@capacitor/cli": "^7.4.3",
++-    "@types/express": "^4.17.21",
++-    "@types/node": "^22.14.0",
++-    "autoprefixer": "^10.4.21",
++-    "esbuild": "^0.25.0",
++     "tailwindcss": "^4.1.14",
++     "tsx": "^4.21.0",
++     "typescript": "~5.8.2",
+++    "vite": "^6.2.3",
++     "vite-plugin-pwa": "^1.3.0"
+++  },
+++  "devDependencies": {
+++    "autoprefixer": "^10.4.21"
++   }
++ }
++diff --git a/public/manifest.json b/public/manifest.json
++new file mode 100644
++index 0000000..fb12ae0
++--- /dev/null
+++++ b/public/manifest.json
++@@ -0,0 +1,45 @@
+++{
+++  "id": "/",
+++  "name": "Willy Kilo Takip - AI Kalori ve Diyet",
+++  "short_name": "Willy Kilo",
+++  "description": "Yazio benzeri AI kalori sayacı, aralıklı oruç, su takibi ve kilo takip uygulaması.",
+++  "start_url": "/",
+++  "scope": "/",
+++  "display": "standalone",
+++  "orientation": "portrait",
+++  "background_color": "#020617",
+++  "theme_color": "#0f172a",
+++  "categories": ["health", "fitness", "lifestyle"],
+++  "icons": [
+++    {
+++      "src": "/pwa-192x192.png",
+++      "sizes": "192x192",
+++      "type": "image/png",
+++      "purpose": "any"
+++    },
+++    {
+++      "src": "/pwa-512x512.png",
+++      "sizes": "512x512",
+++      "type": "image/png",
+++      "purpose": "any"
+++    },
+++    {
+++      "src": "/pwa-512x512.png",
+++      "sizes": "512x512",
+++      "type": "image/png",
+++      "purpose": "maskable"
+++    }
+++  ],
+++  "shortcuts": [
+++    {
+++      "name": "Yemek Ekle",
+++      "url": "/?action=add-meal",
+++      "description": "Hızlı kalori ve yemek kaydet"
+++    },
+++    {
+++      "name": "Oruç Başlat",
+++      "url": "/?action=fasting",
+++      "description": "Aralıklı oruç sayacı"
+++    }
+++  ]
+++}
++diff --git a/public/manifest.webmanifest b/public/manifest.webmanifest
++new file mode 100644
++index 0000000..61f0d4f
++--- /dev/null
+++++ b/public/manifest.webmanifest
++@@ -0,0 +1,33 @@
+++{
+++  "id": "/",
+++  "name": "Willy Kilo Takip - AI Kalori ve Diyet",
+++  "short_name": "Willy Kilo",
+++  "description": "Yazio benzeri AI kalori sayacı, aralıklı oruç, su takibi ve kilo takip uygulaması.",
+++  "start_url": "/",
+++  "scope": "/",
+++  "display": "standalone",
+++  "orientation": "portrait",
+++  "background_color": "#020617",
+++  "theme_color": "#0f172a",
+++  "categories": ["health", "fitness", "lifestyle"],
+++  "icons": [
+++    {
+++      "src": "/pwa-192x192.png",
+++      "sizes": "192x192",
+++      "type": "image/png",
+++      "purpose": "any"
+++    },
+++    {
+++      "src": "/pwa-512x512.png",
+++      "sizes": "512x512",
+++      "type": "image/png",
+++      "purpose": "any"
+++    },
+++    {
+++      "src": "/pwa-512x512.png",
+++      "sizes": "512x512",
+++      "type": "image/png",
+++      "purpose": "maskable"
+++    }
+++  ]
+++}
++diff --git a/public/patch.diff b/public/patch.diff
++new file mode 100644
++index 0000000..6b0cb2b
++--- /dev/null
+++++ b/public/patch.diff
++@@ -0,0 +1,1214 @@
+++From 4bbbb3f6356a315308de6548f6af6a4008d10ac9 Mon Sep 17 00:00:00 2001
+++From: kanunal99-jpg <kanunal99@gmail.com>
+++Date: Sat, 5 Sep 2026 13:25:42 +0000
+++Subject: [PATCH] fix(production): resolve Render crash, dynamic port binding,
+++ and add PWA assets
+++
+++---
+++ README.md                           | 101 ++++++++
+++ data/cloud_sync_db.json             | 168 ++++++++++++
+++ index.html                          |   2 +-
+++ package.json                        |  22 +-
+++ public/manifest.json                |  45 ++++
+++ public/manifest.webmanifest         |  33 +++
+++ public/sw.js                        |  56 ++++
+++ server.ts                           |   7 +-
+++ src/App.tsx                         |   9 +
+++ src/components/ApkExportModal.tsx   | 389 ++++++++++++++++++++++++++++
+++ src/components/Header.tsx           |  18 +-
+++ src/components/PWAInstallButton.tsx | 104 +-------
+++ src/main.tsx                        |   8 +
+++ 13 files changed, 851 insertions(+), 111 deletions(-)
+++ create mode 100644 README.md
+++ create mode 100644 public/manifest.json
+++ create mode 100644 public/manifest.webmanifest
+++ create mode 100644 public/sw.js
+++ create mode 100644 src/components/ApkExportModal.tsx
+++
+++diff --git a/README.md b/README.md
+++new file mode 100644
+++index 0000000..a9b4b72
+++--- /dev/null
++++++ b/README.md
+++@@ -0,0 +1,101 @@
++++# Willy Kilo Takip 🍏🏋️
++++
++++Willy Kilo Takip; modern React 19, TypeScript, Tailwind CSS ve Node.js Express ile geliştirilmiş, aralıklı oruç takipçisi, yapay zeka destekli yemek analizi ve kalori günlüğü uygulamasıdır.
++++
++++---
++++
++++## 💻 Terminal Kurulum Adımları (Geliştirme Ortamı)
++++
++++### 1. Gereksinimler
++++- **Node.js**: v18.0.0 veya üzeri (`node -v` ile kontrol edebilirsiniz)
++++- **npm**: v9.0.0 veya üzeri (`npm -v`)
++++
++++### 2. Bağımlılıkları Yükleme
++++Terminalinizi açıp proje klasörüne gidin ve paketleri kurun:
++++```bash
++++npm install
++++```
++++
++++### 3. Ortam Değişkeni (.env) Ayarı (Opsiyonel)
++++Yapay Zeka (Gemini) beslenme koçu ve fotoğraf tarama özelliklerini aktifleştirmek için `.env.example` dosyasını `.env` olarak kopyalayın:
++++```bash
++++cp .env.example .env
++++```
++++Ardından `.env` dosyasını açıp Google AI Studio API anahtarınızı ekleyin:
++++```env
++++GEMINI_API_KEY=your_gemini_api_key_here
++++```
++++
++++### 4. Geliştirme Sunucusunu Başlatma
++++```bash
++++npm run dev
++++```
++++Sunucu başladığında tarayıcınızda şu adresi açın:
++++👉 **`http://localhost:3000`**
++++
++++---
++++
++++## 🚀 Üretim (Production) Derlemesi ve Çalıştırma
++++
++++Projeyi canlı sunucuda veya Docker/Cloud Run konteynerinde çalıştırmak için:
++++
++++```bash
++++# 1. Frontend ve Backend'i tek komutla derleyin:
++++npm run build
++++
++++# 2. Üretim sunucusunu başlatın:
++++npm start
++++```
++++
++++---
++++
++++## 📱 Terminalden Doğrudan Android APK Üretme
++++
++++### Yöntem A: Google Bubblewrap CLI (En Hızlı)
++++Android Studio kurmadan doğrudan terminal üzerinden imzalı `.apk` dosyası üretmek için:
++++
++++```bash
++++# 1. Bubblewrap CLI aracını küresel olarak yükleyin:
++++npm install -g @bubblewrap/cli
++++
++++# 2. Canlı uygulamanızın manifest dosyasıyla projeyi oluşturun:
++++bubblewrap init --manifest="https://ais-dev-dvnvts6sqeqpm2rx53m2ma-627591680405.europe-west2.run.app/manifest.webmanifest"
++++
++++# 3. İmzalı APK'yı derleyin:
++++bubblewrap build
++++```
++++Bu işlem sonunda bulunduğunuz dizinde doğrudan Android cihazlara yüklenebilir `app-release-signed.apk` dosyası oluşur.
++++
++++---
++++
++++### Yöntem B: Capacitor & Android Studio ile APK Derleme
++++
++++```bash
++++# 1. Capacitor paketlerini yükleyin:
++++npm install @capacitor/core @capacitor/cli @capacitor/android
++++
++++# 2. Capacitor'ı başlatın:
++++npx cap init "Willy Kilo Takip" com.willy.kilotakip --web-dir dist
++++
++++# 3. Android platform klasörünü ekleyin:
++++npx cap add android
++++
++++# 4. Projeyi derleyip Android'e aktarın:
++++npm run build
++++npx cap sync android
++++
++++# 5. Android Studio'yu açıp APK üretin:
++++npx cap open android
++++```
++++Android Studio açıldığında menüden **Build > Build Bundle(s) / APK(s) > Build APK(s)** seçeneğine basarak APK dosyanızı elde edebilirsiniz.
++++
++++---
++++
++++## 🛠️ Komut Özeti
++++
++++| Komut | Açıklama |
++++|---|---|
++++| `npm run dev` | Geliştirme sunucusunu başlatır (Vite + Express) |
++++| `npm run build` | Hem frontend hem sunucu kodunu `dist/` klasörüne derler |
++++| `npm start` | Derlenmiş üretim sunucusunu çalıştırır |
++++| `npm run lint` | TypeScript tip kontrollerini gerçekleştirir |
+++diff --git a/data/cloud_sync_db.json b/data/cloud_sync_db.json
+++index 164f339..a4a5715 100644
+++--- a/data/cloud_sync_db.json
++++++ b/data/cloud_sync_db.json
+++@@ -8,5 +8,173 @@
+++     "fastingHistory": [],
+++     "weightRecords": [],
+++     "customRecipes": []
++++  },
++++  "WILLY-823902": {
++++    "lastUpdated": 1788614702913,
++++    "profile": {
++++      "id": "willy-user-default",
++++      "name": "Willy Dostu",
++++      "gender": "female",
++++      "age": 28,
++++      "heightCm": 168,
++++      "currentWeightKg": 68.5,
++++      "startingWeightKg": 75,
++++      "targetWeightKg": 60,
++++      "goal": "lose_weight",
++++      "activityLevel": "moderate",
++++      "dailyCalorieTarget": 1650,
++++      "macroTargets": {
++++        "carbs": 165,
++++        "protein": 105,
++++        "fat": 55
++++      },
++++      "waterTargetMl": 2250,
++++      "fastingPlan": "16:8",
++++      "cloudSyncKey": "WILLY-823902",
++++      "diamonds": 2450,
++++      "streakDays": 14
++++    },
++++    "dailyLogs": {
++++      "2026-09-05": {
++++        "date": "2026-09-05",
++++        "entries": [
++++          {
++++            "id": "init-1",
++++            "name": "Haşlanmış Yumurta (2 Adet)",
++++            "mealType": "breakfast",
++++            "servingAmount": 2,
++++            "servingUnit": "adet",
++++            "calories": 156,
++++            "carbs": 1.2,
++++            "protein": 12.6,
++++            "fat": 10.6,
++++            "fiber": 0,
++++            "healthScore": 95,
++++            "pros": [
++++              "İyi protein kaynağı",
++++              "Sıfır şeker"
++++            ],
++++            "timestamp": 1788593512676
++++          },
++++          {
++++            "id": "init-2",
++++            "name": "Beyaz Peynir & Yeşillik",
++++            "mealType": "breakfast",
++++            "servingAmount": 40,
++++            "servingUnit": "gram",
++++            "calories": 124,
++++            "carbs": 1.5,
++++            "protein": 8.5,
++++            "fat": 9.6,
++++            "fiber": 1.2,
++++            "healthScore": 88,
++++            "pros": [
++++              "Kalsiyum deposu"
++++            ],
++++            "timestamp": 1788593872676
++++          },
++++          {
++++            "id": "init-3",
++++            "name": "Izgara Tavuklu Kinoa Salatası",
++++            "mealType": "lunch",
++++            "servingAmount": 1,
++++            "servingUnit": "porsiyon",
++++            "calories": 460,
++++            "carbs": 38,
++++            "protein": 42,
++++            "fat": 14,
++++            "fiber": 6.5,
++++            "healthScore": 98,
++++            "pros": [
++++              "Yüksek protein",
++++              "Kompleks karbonhidrat"
++++            ],
++++            "timestamp": 1788604312676
++++          }
++++        ],
++++        "waterIntakeMl": 1750,
++++        "steps": 6420,
++++        "exercises": [
++++          {
++++            "id": "ex-1",
++++            "title": "Tempolu Yürüyüş",
++++            "durationMinutes": 35,
++++            "caloriesBurned": 185,
++++            "steps": 4200,
++++            "timestamp": 1788600712676
++++          }
++++        ],
++++        "notes": "Enerjim bugün çok yüksekti!"
++++      }
++++    },
++++    "fastingHistory": [
++++      {
++++        "id": "fh-1",
++++        "plan": "16:8",
++++        "startTime": 1788291112676,
++++        "endTime": 1788348712676,
++++        "targetDurationHours": 16,
++++        "completed": true
++++      },
++++      {
++++        "id": "fh-2",
++++        "plan": "16:8",
++++        "startTime": 1788375712676,
++++        "endTime": 1788435112676,
++++        "targetDurationHours": 16,
++++        "completed": true
++++      },
++++      {
++++        "id": "fh-3",
++++        "plan": "16:8",
++++        "startTime": 1788463912676,
++++        "endTime": 1788521512676,
++++        "targetDurationHours": 16,
++++        "completed": true
++++      }
++++    ],
++++    "weightRecords": [
++++      {
++++        "id": "w-1",
++++        "date": "14 Gün Önce",
++++        "weightKg": 72,
++++        "bodyFat": 26.5,
++++        "waistCm": 82,
++++        "timestamp": 1787398312676
++++      },
++++      {
++++        "id": "w-2",
++++        "date": "10 Gün Önce",
++++        "weightKg": 71.2,
++++        "bodyFat": 26,
++++        "waistCm": 81,
++++        "timestamp": 1787743912676
++++      },
++++      {
++++        "id": "w-3",
++++        "date": "7 Gün Önce",
++++        "weightKg": 70.4,
++++        "bodyFat": 25.4,
++++        "waistCm": 80,
++++        "timestamp": 1788003112676
++++      },
++++      {
++++        "id": "w-4",
++++        "date": "3 Gün Önce",
++++        "weightKg": 69.3,
++++        "bodyFat": 24.8,
++++        "waistCm": 79,
++++        "timestamp": 1788348712676
++++      },
++++      {
++++        "id": "w-5",
++++        "date": "Bugün",
++++        "weightKg": 68.5,
++++        "bodyFat": 24.2,
++++        "waistCm": 78,
++++        "timestamp": 1788607912676
++++      }
++++    ],
++++    "customRecipes": []
+++   }
+++ }
+++\ No newline at end of file
+++diff --git a/index.html b/index.html
+++index ee9bfe1..a469dbb 100644
+++--- a/index.html
++++++ b/index.html
+++@@ -18,7 +18,7 @@
+++     <meta name="apple-mobile-web-app-title" content="Willy Takip" />
+++     <link rel="apple-touch-icon" href="/pwa-192x192.png" />
+++     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+++-    <link rel="manifest" href="/manifest.webmanifest" />
++++    <link rel="manifest" href="/manifest.json" />
+++ 
+++     <!-- Google Fonts for sleek modern typography -->
+++     <link rel="preconnect" href="https://fonts.googleapis.com" />
+++diff --git a/package.json b/package.json
+++index a20e2fb..5b632d6 100644
+++--- a/package.json
++++++ b/package.json
+++@@ -13,27 +13,27 @@
+++   },
+++   "dependencies": {
+++     "@capacitor/android": "^7.4.3",
++++    "@capacitor/cli": "^7.4.3",
+++     "@capacitor/core": "^7.4.3",
+++     "@google/genai": "^2.4.0",
+++     "@tailwindcss/vite": "^4.1.14",
++++    "@types/express": "^4.17.21",
++++    "@types/node": "^22.14.0",
+++     "@vitejs/plugin-react": "^5.0.4",
++++    "dotenv": "^17.2.3",
++++    "esbuild": "^0.25.0",
++++    "express": "^4.21.2",
+++     "lucide-react": "^0.546.0",
++++    "motion": "^12.23.24",
+++     "react": "^19.0.1",
+++     "react-dom": "^19.0.1",
+++-    "vite": "^6.2.3",
+++-    "express": "^4.21.2",
+++-    "dotenv": "^17.2.3",
+++-    "motion": "^12.23.24"
+++-  },
+++-  "devDependencies": {
+++-    "@capacitor/cli": "^7.4.3",
+++-    "@types/express": "^4.17.21",
+++-    "@types/node": "^22.14.0",
+++-    "autoprefixer": "^10.4.21",
+++-    "esbuild": "^0.25.0",
+++     "tailwindcss": "^4.1.14",
+++     "tsx": "^4.21.0",
+++     "typescript": "~5.8.2",
++++    "vite": "^6.2.3",
+++     "vite-plugin-pwa": "^1.3.0"
++++  },
++++  "devDependencies": {
++++    "autoprefixer": "^10.4.21"
+++   }
+++ }
+++diff --git a/public/manifest.json b/public/manifest.json
+++new file mode 100644
+++index 0000000..fb12ae0
+++--- /dev/null
++++++ b/public/manifest.json
+++@@ -0,0 +1,45 @@
++++{
++++  "id": "/",
++++  "name": "Willy Kilo Takip - AI Kalori ve Diyet",
++++  "short_name": "Willy Kilo",
++++  "description": "Yazio benzeri AI kalori sayacı, aralıklı oruç, su takibi ve kilo takip uygulaması.",
++++  "start_url": "/",
++++  "scope": "/",
++++  "display": "standalone",
++++  "orientation": "portrait",
++++  "background_color": "#020617",
++++  "theme_color": "#0f172a",
++++  "categories": ["health", "fitness", "lifestyle"],
++++  "icons": [
++++    {
++++      "src": "/pwa-192x192.png",
++++      "sizes": "192x192",
++++      "type": "image/png",
++++      "purpose": "any"
++++    },
++++    {
++++      "src": "/pwa-512x512.png",
++++      "sizes": "512x512",
++++      "type": "image/png",
++++      "purpose": "any"
++++    },
++++    {
++++      "src": "/pwa-512x512.png",
++++      "sizes": "512x512",
++++      "type": "image/png",
++++      "purpose": "maskable"
++++    }
++++  ],
++++  "shortcuts": [
++++    {
++++      "name": "Yemek Ekle",
++++      "url": "/?action=add-meal",
++++      "description": "Hızlı kalori ve yemek kaydet"
++++    },
++++    {
++++      "name": "Oruç Başlat",
++++      "url": "/?action=fasting",
++++      "description": "Aralıklı oruç sayacı"
++++    }
++++  ]
++++}
+++diff --git a/public/manifest.webmanifest b/public/manifest.webmanifest
+++new file mode 100644
+++index 0000000..61f0d4f
+++--- /dev/null
++++++ b/public/manifest.webmanifest
+++@@ -0,0 +1,33 @@
++++{
++++  "id": "/",
++++  "name": "Willy Kilo Takip - AI Kalori ve Diyet",
++++  "short_name": "Willy Kilo",
++++  "description": "Yazio benzeri AI kalori sayacı, aralıklı oruç, su takibi ve kilo takip uygulaması.",
++++  "start_url": "/",
++++  "scope": "/",
++++  "display": "standalone",
++++  "orientation": "portrait",
++++  "background_color": "#020617",
++++  "theme_color": "#0f172a",
++++  "categories": ["health", "fitness", "lifestyle"],
++++  "icons": [
++++    {
++++      "src": "/pwa-192x192.png",
++++      "sizes": "192x192",
++++      "type": "image/png",
++++      "purpose": "any"
++++    },
++++    {
++++      "src": "/pwa-512x512.png",
++++      "sizes": "512x512",
++++      "type": "image/png",
++++      "purpose": "any"
++++    },
++++    {
++++      "src": "/pwa-512x512.png",
++++      "sizes": "512x512",
++++      "type": "image/png",
++++      "purpose": "maskable"
++++    }
++++  ]
++++}
+++diff --git a/public/sw.js b/public/sw.js
+++new file mode 100644
+++index 0000000..fb48bcb
+++--- /dev/null
++++++ b/public/sw.js
+++@@ -0,0 +1,56 @@
++++// Service Worker for Willy Kilo Takip PWA
++++const CACHE_NAME = 'willy-kilo-cache-v1';
++++const ASSETS_TO_CACHE = [
++++  '/',
++++  '/index.html',
++++  '/manifest.json',
++++  '/manifest.webmanifest',
++++  '/pwa-192x192.png',
++++  '/pwa-512x512.png',
++++  '/icon.svg'
++++];
++++
++++self.addEventListener('install', (event) => {
++++  event.waitUntil(
++++    caches.open(CACHE_NAME).then((cache) => {
++++      return cache.addAll(ASSETS_TO_CACHE).catch(() => {});
++++    })
++++  );
++++  self.skipWaiting();
++++});
++++
++++self.addEventListener('activate', (event) => {
++++  event.waitUntil(
++++    caches.keys().then((keys) => {
++++      return Promise.all(
++++        keys.map((key) => {
++++          if (key !== CACHE_NAME) {
++++            return caches.delete(key);
++++          }
++++        })
++++      );
++++    })
++++  );
++++  self.clients.claim();
++++});
++++
++++self.addEventListener('fetch', (event) => {
++++  if (event.request.method !== 'GET') return;
++++  // Skip API or Google fonts caching failures
++++  if (event.request.url.includes('/api/')) return;
++++
++++  event.respondWith(
++++    caches.match(event.request).then((cachedResponse) => {
++++      if (cachedResponse) {
++++        return cachedResponse;
++++      }
++++      return fetch(event.request).then((networkResponse) => {
++++        return networkResponse;
++++      }).catch(() => {
++++        if (event.request.mode === 'navigate') {
++++          return caches.match('/');
++++        }
++++      });
++++    })
++++  );
++++});
+++diff --git a/server.ts b/server.ts
+++index 18d9c7f..e0cfa9c 100644
+++--- a/server.ts
++++++ b/server.ts
+++@@ -1,15 +1,12 @@
+++ import express from 'express';
+++ import path from 'path';
+++ import fs from 'fs';
+++-import { fileURLToPath } from 'url';
+++ import { GoogleGenAI } from '@google/genai';
+++ import { createServer as createViteServer } from 'vite';
+++ 
+++-const __filename = fileURLToPath(import.meta.url);
+++-const __dirname = path.dirname(__filename);
+++-
+++ const app = express();
+++-const PORT = 3000;
++++// Support Render / cloud hosting dynamic port assignment, with default fallback to 3000 for local & AI Studio
++++const PORT = process.env.RENDER ? (Number(process.env.PORT) || 10000) : (process.env.NODE_ENV === 'production' && process.env.PORT && process.env.PORT !== '8080' ? Number(process.env.PORT) : 3000);
+++ 
+++ // Middleware for parsing large JSON payloads (food photos)
+++ app.use(express.json({ limit: '20mb' }));
+++diff --git a/src/App.tsx b/src/App.tsx
+++index 09eb524..93d3f1d 100644
+++--- a/src/App.tsx
++++++ b/src/App.tsx
+++@@ -28,6 +28,7 @@ import { WeightTab } from './components/WeightTab';
+++ import { WillyCoachTab } from './components/WillyCoachTab';
+++ import { CloudSyncModal } from './components/CloudSyncModal';
+++ import { ProfileModal } from './components/ProfileModal';
++++import { ApkExportModal } from './components/ApkExportModal';
+++ import { OfflineIndicator } from './components/OfflineIndicator';
+++ import { PWAInstallButton } from './components/PWAInstallButton';
+++ 
+++@@ -52,6 +53,7 @@ export function App() {
+++   const [targetMeal, setTargetMeal] = useState<MealType>('breakfast');
+++   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+++   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
++++  const [isApkModalOpen, setIsApkModalOpen] = useState(false);
+++   const [isSyncing, setIsSyncing] = useState(false);
+++   const [lastSyncTimestamp, setLastSyncTimestamp] = useState<number>(Date.now());
+++ 
+++@@ -342,6 +344,7 @@ export function App() {
+++         onToday={handleToday}
+++         onOpenSyncModal={() => setIsSyncModalOpen(true)}
+++         onOpenProfileModal={() => setIsProfileModalOpen(true)}
++++        onOpenApkModal={() => setIsApkModalOpen(true)}
+++         isSyncing={isSyncing}
+++       />
+++ 
+++@@ -460,6 +463,12 @@ export function App() {
+++         onSaveProfile={(updated) => setProfile(updated)}
+++       />
+++ 
++++      {/* APK Export & Download Modal */}
++++      <ApkExportModal
++++        isOpen={isApkModalOpen}
++++        onClose={() => setIsApkModalOpen(false)}
++++      />
++++
+++       {/* PWA Offline indicator */}
+++       <OfflineIndicator />
+++     </div>
+++diff --git a/src/components/ApkExportModal.tsx b/src/components/ApkExportModal.tsx
+++new file mode 100644
+++index 0000000..4411507
+++--- /dev/null
++++++ b/src/components/ApkExportModal.tsx
+++@@ -0,0 +1,389 @@
++++import React, { useState } from 'react';
++++import { Download, Smartphone, Globe, ExternalLink, QrCode, Check, Copy, Package, ShieldCheck, X, Terminal, FileCode2, Play } from 'lucide-react';
++++
++++interface ApkExportModalProps {
++++  isOpen: boolean;
++++  onClose: () => void;
++++}
++++
++++export const ApkExportModal: React.FC<ApkExportModalProps> = ({ isOpen, onClose }) => {
++++  const [activeTab, setActiveTab] = useState<'terminal' | 'pwabuilder' | 'webapk' | 'capacitor' | 'qr'>('terminal');
++++  const [copiedUrl, setCopiedUrl] = useState(false);
++++  const [copiedCode, setCopiedCode] = useState<string | null>(null);
++++
++++  if (!isOpen) return null;
++++
++++  const currentUrl = typeof window !== 'undefined' ? window.location.origin : 'https://willy-kilo-takip.app';
++++  const pwaBuilderUrl = `https://www.pwabuilder.com/?url=${encodeURIComponent(currentUrl)}`;
++++
++++  const handleCopyUrl = () => {
++++    navigator.clipboard.writeText(currentUrl);
++++    setCopiedUrl(true);
++++    setTimeout(() => setCopiedUrl(false), 2000);
++++  };
++++
++++  const copyText = (text: string, id: string) => {
++++    navigator.clipboard.writeText(text);
++++    setCopiedCode(id);
++++    setTimeout(() => setCopiedCode(null), 2000);
++++  };
++++
++++  const terminalDevCommands = `# 1. Proje klasörüne girin:
++++cd willy-kilo-takip
++++
++++# 2. Bağımlılıkları yükleyin:
++++npm install
++++
++++# 3. Ortam değişkenini ayarlayın (Opsiyonel - AI için):
++++cp .env.example .env
++++# .env dosyasını açıp GEMINI_API_KEY ekleyebilirsiniz.
++++
++++# 4. Geliştirme sunucusunu başlatın:
++++npm run dev
++++
++++# Uygulama http://localhost:3000 adresinde anında açılır!`;
++++
++++  const terminalBubblewrapCommands = `# Google'ın resmi Bubblewrap CLI aracı ile terminalden tek adımda APK derleme:
++++# 1. Bubblewrap CLI kurulumu (Node.js gerektirir):
++++npm install -g @bubblewrap/cli
++++
++++# 2. Canlı manifest adresinizden projeyi başlatın:
++++npx @bubblewrap/cli init --manifest="${currentUrl}/manifest.webmanifest"
++++
++++# 3. İmzalı APK'yı tek komutla oluşturun:
++++npx @bubblewrap/cli build
++++
++++# Çıktı: Klasörünüzde doğrudan yüklenebilir 'app-release-signed.apk' üretilir!`;
++++
++++  const capacitorCommands = `# Capacitor ile yerel Android Studio projesi oluşturup APK alma:
++++npm install @capacitor/core @capacitor/cli @capacitor/android
++++
++++# Projeyi başlatın:
++++npx cap init "Willy Kilo Takip" com.willy.kilotakip --web-dir dist
++++
++++# Android platformunu ekleyin:
++++npx cap add android
++++
++++# Projeyi derleyin ve Android klasörüne kopyalayın:
++++npm run build
++++npx cap sync android
++++
++++# Android Studio'yu açıp APK üretin (Build > Build APK):
++++npx cap open android`;
++++
++++  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(currentUrl)}&bgcolor=0f172a&color=34d399&margin=10`;
++++
++++  return (
++++    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
++++      <div className="w-full max-w-xl rounded-3xl bg-slate-900 border border-slate-700 max-h-[92vh] flex flex-col shadow-2xl text-slate-100 overflow-hidden">
++++        {/* Header */}
++++        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
++++          <div className="flex items-center gap-3">
++++            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 to-cyan-500 p-0.5 shadow-md shadow-emerald-500/20">
++++              <div className="w-full h-full rounded-[14px] bg-slate-950 flex items-center justify-center text-emerald-400">
++++                <Terminal className="w-5 h-5" />
++++              </div>
++++            </div>
++++            <div>
++++              <h3 className="text-base font-extrabold text-white flex items-center gap-2">
++++                Terminal Kurulum & APK Merkezi
++++                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
++++                  CLI & Android
++++                </span>
++++              </h3>
++++              <p className="text-xs text-slate-400">Projeyi bilgisayarınızda veya terminalde çalıştırma rehberi</p>
++++            </div>
++++          </div>
++++          <button
++++            onClick={onClose}
++++            className="p-2 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition"
++++          >
++++            <X className="w-5 h-5" />
++++          </button>
++++        </div>
++++
++++        {/* Tab Selection */}
++++        <div className="flex border-b border-slate-800 bg-slate-950/40 px-6 pt-2 gap-2 overflow-x-auto">
++++          <button
++++            onClick={() => setActiveTab('terminal')}
++++            className={`pb-3 px-3 text-xs font-semibold whitespace-nowrap border-b-2 transition ${
++++              activeTab === 'terminal'
++++                ? 'border-emerald-400 text-emerald-400'
++++                : 'border-transparent text-slate-400 hover:text-slate-200'
++++            }`}
++++          >
++++            💻 1. Terminal Kurulumu
++++          </button>
++++
++++          <button
++++            onClick={() => setActiveTab('pwabuilder')}
++++            className={`pb-3 px-3 text-xs font-semibold whitespace-nowrap border-b-2 transition ${
++++              activeTab === 'pwabuilder'
++++                ? 'border-emerald-400 text-emerald-400'
++++                : 'border-transparent text-slate-400 hover:text-slate-200'
++++            }`}
++++          >
++++            ⚡ 2. Hızlı APK (PWABuilder)
++++          </button>
++++
++++          <button
++++            onClick={() => setActiveTab('webapk')}
++++            className={`pb-3 px-3 text-xs font-semibold whitespace-nowrap border-b-2 transition ${
++++              activeTab === 'webapk'
++++                ? 'border-emerald-400 text-emerald-400'
++++                : 'border-transparent text-slate-400 hover:text-slate-200'
++++            }`}
++++          >
++++            📱 3. Doğrudan WebAPK
++++          </button>
++++
++++          <button
++++            onClick={() => setActiveTab('capacitor')}
++++            className={`pb-3 px-3 text-xs font-semibold whitespace-nowrap border-b-2 transition ${
++++              activeTab === 'capacitor'
++++                ? 'border-emerald-400 text-emerald-400'
++++                : 'border-transparent text-slate-400 hover:text-slate-200'
++++            }`}
++++          >
++++            🛠️ 4. Terminalden APK Derleme
++++          </button>
++++
++++          <button
++++            onClick={() => setActiveTab('qr')}
++++            className={`pb-3 px-3 text-xs font-semibold whitespace-nowrap border-b-2 transition ${
++++              activeTab === 'qr'
++++                ? 'border-emerald-400 text-emerald-400'
++++                : 'border-transparent text-slate-400 hover:text-slate-200'
++++            }`}
++++          >
++++            📷 5. QR Tara
++++          </button>
++++        </div>
++++
++++        {/* Tab Content */}
++++        <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
++++          {/* TAB 1: TERMINAL KURULUMU */}
++++          {activeTab === 'terminal' && (
++++            <div className="space-y-4">
++++              <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-900 border border-emerald-500/30 space-y-3">
++++                <div className="flex items-center justify-between">
++++                  <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
++++                    <Terminal className="w-4 h-4" />
++++                    <span>Lokal Bilgisayarda Terminal Kurulum Adımları</span>
++++                  </div>
++++                  <button
++++                    onClick={() => copyText(terminalDevCommands, 'dev')}
++++                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-[11px] flex items-center gap-1 transition"
++++                  >
++++                    {copiedCode === 'dev' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
++++                    <span>{copiedCode === 'dev' ? 'Kopyalandı' : 'Kopyala'}</span>
++++                  </button>
++++                </div>
++++
++++                <p className="text-slate-300 leading-relaxed">
++++                  Projeyi sağ üst köşedeki menüden <strong>Export to ZIP</strong> ile bilgisayarınıza indirdikten sonra veya terminalinizde şu komutları sırayla çalıştırın:
++++                </p>
++++
++++                <pre className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 text-[11px] font-mono text-emerald-300 overflow-x-auto leading-relaxed select-all">
++++                  {terminalDevCommands}
++++                </pre>
++++              </div>
++++
++++              {/* Requirements */}
++++              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
++++                <span className="text-white font-bold block">Sistem Gereksinimleri & Notlar:</span>
++++                <ul className="space-y-1.5 text-slate-400 list-disc list-inside">
++++                  <li><strong className="text-slate-200">Node.js:</strong> v18.0.0 veya üzeri (v20+ tavsiye edilir).</li>
++++                  <li><strong className="text-slate-200">Port:</strong> Uygulama varsayılan olarak <code className="text-cyan-400">http://localhost:3000</code> portunda başlar.</li>
++++                  <li><strong className="text-slate-200">Üretim Derlemesi:</strong> <code className="text-emerald-400">npm run build</code> komutu hem Vite frontend'i hem de Node backend'i tek tıkla derler.</li>
++++                  <li><strong className="text-slate-200">Üretim Başlatma:</strong> <code className="text-emerald-400">npm start</code> ile canlıya alınabilir.</li>
++++                </ul>
++++              </div>
++++            </div>
++++          )}
++++
++++          {/* TAB 2: PWABUILDER */}
++++          {activeTab === 'pwabuilder' && (
++++            <div className="space-y-4">
++++              <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-900 border border-emerald-500/30 space-y-3">
++++                <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
++++                  <Package className="w-4 h-4" />
++++                  <span>PWABuilder ile Doğrudan .APK Dosyası Üretin</span>
++++                </div>
++++                <p className="text-slate-300 leading-relaxed">
++++                  Willy Kilo Takip, tüm Android gereksinimlerini ve Manifest / Servis Çalışanı (Service Worker) standartlarını karşılamaktadır. <strong>PWABuilder</strong> resmi aracı ile tek tıkla imzalı <code>.apk</code> veya Google Play Store için <code>.aab</code> paketi indirebilirsiniz.
++++                </p>
++++
++++                <div className="space-y-2 pt-1">
++++                  <label className="text-slate-400 block font-medium">Uygulamanızın Canlı URL Bağlantısı:</label>
++++                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-950 border border-slate-700">
++++                    <Globe className="w-4 h-4 text-cyan-400 shrink-0" />
++++                    <span className="flex-1 font-mono text-cyan-300 truncate select-all">{currentUrl}</span>
++++                    <button
++++                      onClick={handleCopyUrl}
++++                      className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold flex items-center gap-1 transition"
++++                    >
++++                      {copiedUrl ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
++++                      <span>{copiedUrl ? 'Kopyalandı' : 'Kopyala'}</span>
++++                    </button>
++++                  </div>
++++                </div>
++++
++++                <a
++++                  href={pwaBuilderUrl}
++++                  target="_blank"
++++                  rel="noopener noreferrer"
++++                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 active:scale-95 transition"
++++                >
++++                  <span>PWABuilder'da APK Oluştur & İndir</span>
++++                  <ExternalLink className="w-4 h-4" />
++++                </a>
++++              </div>
++++
++++              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
++++                <span className="text-white font-bold block">Adım Adım APK İndirme:</span>
++++                <ol className="list-decimal list-inside space-y-1.5 text-slate-400 pl-1">
++++                  <li>Yukarıdaki butona tıklayarak PWABuilder'ı açın (URL'niz otomatik doldurulacaktır).</li>
++++                  <li>Sayfanın üstündeki <strong>"Package for Stores"</strong> veya <strong>"Android"</strong> sekmesine tıklayın.</li>
++++                  <li><strong>"Generate APK"</strong> butonuna basın; birkaç saniye içinde <code>Willy-Kilo-Takip.apk</code> cihazınıza inecektir.</li>
++++                  <li>İnen APK dosyasını Android telefonunuza kurup kullanmaya başlayın!</li>
++++                </ol>
++++              </div>
++++            </div>
++++          )}
++++
++++          {/* TAB 3: WEBAPK */}
++++          {activeTab === 'webapk' && (
++++            <div className="space-y-4">
++++              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
++++                <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm">
++++                  <Smartphone className="w-4 h-4" />
++++                  <span>Google Chrome Otomatik WebAPK Teknolojisi</span>
++++                </div>
++++                <p className="text-slate-300 leading-relaxed">
++++                  Android cihazlarda Google Chrome ve Samsung Internet tarayıcıları, PWA uygulamalarını doğrudan işletim sistemi düzeyinde gerçek bir <strong>WebAPK</strong> paketine dönüştürür.
++++                </p>
++++
++++                <div className="space-y-2.5 pt-2">
++++                  <div className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-900 border border-slate-800">
++++                    <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">1</span>
++++                    <p className="text-slate-300">
++++                      Android telefonunuzda Chrome tarayıcısını açıp bu uygulamanın bağlantısını açın.
++++                    </p>
++++                  </div>
++++
++++                  <div className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-900 border border-slate-800">
++++                    <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">2</span>
++++                    <p className="text-slate-300">
++++                      Üst bardaki <strong>"APK İndir"</strong> butonuna veya tarayıcı menüsünden <strong>"Uygulamayı Yükle"</strong> seçeneğine dokunun.
++++                    </p>
++++                  </div>
++++
++++                  <div className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-900 border border-slate-800">
++++                    <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">3</span>
++++                    <p className="text-slate-300">
++++                      Android Play Services telefonunuza yerel bir APK paketi kurar. Uygulama bildirim çekmecesinde, uygulama çekmecesinde ve ayarlar menüsünde bağımsız bir yerel Android uygulaması olarak çalışır!
++++                    </p>
++++                  </div>
++++                </div>
++++              </div>
++++            </div>
++++          )}
++++
++++          {/* TAB 4: TERMINAL APK BUILD (Bubblewrap & Capacitor) */}
++++          {activeTab === 'capacitor' && (
++++            <div className="space-y-4">
++++              {/* Option A: Bubblewrap CLI */}
++++              <div className="p-4 rounded-2xl bg-gradient-to-br from-cyan-950/30 via-slate-900 to-slate-900 border border-cyan-500/30 space-y-2.5">
++++                <div className="flex items-center justify-between">
++++                  <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm">
++++                    <Terminal className="w-4 h-4" />
++++                    <span>A) Google Bubblewrap CLI ile Tek Komutta APK</span>
++++                  </div>
++++                  <button
++++                    onClick={() => copyText(terminalBubblewrapCommands, 'bubblewrap')}
++++                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-[11px] flex items-center gap-1 transition"
++++                  >
++++                    {copiedCode === 'bubblewrap' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
++++                    <span>{copiedCode === 'bubblewrap' ? 'Kopyalandı' : 'Kopyala'}</span>
++++                  </button>
++++                </div>
++++                <p className="text-slate-300">Android Studio kurmaya gerek kalmadan, doğrudan terminal üzerinden imzalı APK üretir:</p>
++++                <pre className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-[11px] font-mono text-cyan-300 overflow-x-auto leading-relaxed">
++++                  {terminalBubblewrapCommands}
++++                </pre>
++++              </div>
++++
++++              {/* Option B: Capacitor CLI */}
++++              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2.5">
++++                <div className="flex items-center justify-between">
++++                  <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
++++                    <Package className="w-4 h-4" />
++++                    <span>B) Capacitor & Android Studio ile APK Derleme</span>
++++                  </div>
++++                  <button
++++                    onClick={() => copyText(capacitorCommands, 'capacitor')}
++++                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-[11px] flex items-center gap-1 transition"
++++                  >
++++                    {copiedCode === 'capacitor' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
++++                    <span>{copiedCode === 'capacitor' ? 'Kopyalandı' : 'Kopyala'}</span>
++++                  </button>
++++                </div>
++++                <pre className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-[11px] font-mono text-emerald-300 overflow-x-auto leading-relaxed">
++++                  {capacitorCommands}
++++                </pre>
++++              </div>
++++            </div>
++++          )}
++++
++++          {/* TAB 5: QR CODE */}
++++          {activeTab === 'qr' && (
++++            <div className="flex flex-col items-center justify-center space-y-4 py-2">
++++              <div className="p-3 bg-slate-950 rounded-3xl border border-emerald-500/30 shadow-xl">
++++                <img
++++                  src={qrImageUrl}
++++                  alt="Willy Kilo Takip QR Code"
++++                  className="w-48 h-48 rounded-2xl object-contain"
++++                />
++++              </div>
++++
++++              <div className="text-center max-w-sm">
++++                <h4 className="text-sm font-bold text-white mb-1">Telefonunuzun Kamerasıyla Tarayın</h4>
++++                <p className="text-xs text-slate-400 leading-relaxed">
++++                  Android veya iPhone kameranızı bu QR koda tutarak uygulamayı doğrudan telefonunuzda açabilir ve tek tıkla ana ekranınıza APK / PWA olarak yükleyebilirsiniz.
++++                </p>
++++              </div>
++++
++++              <div className="flex items-center gap-2 p-2 rounded-xl bg-slate-950 border border-slate-800 text-xs">
++++                <Globe className="w-3.5 h-3.5 text-cyan-400" />
++++                <span className="text-slate-300 font-mono select-all text-[11px]">{currentUrl}</span>
++++                <button
++++                  onClick={handleCopyUrl}
++++                  className="p-1 text-slate-400 hover:text-white"
++++                  title="Kopyala"
++++                >
++++                  {copiedUrl ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
++++                </button>
++++              </div>
++++            </div>
++++          )}
++++        </div>
++++
++++        {/* Footer */}
++++        <div className="p-4 border-t border-slate-800 bg-slate-950/60 flex items-center justify-between">
++++          <div className="flex items-center gap-2 text-[11px] text-slate-400">
++++            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
++++            <span>Terminal & Node.js v18+ Uyumlu</span>
++++          </div>
++++
++++          <button
++++            onClick={onClose}
++++            className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition"
++++          >
++++            Kapat
++++          </button>
++++        </div>
++++      </div>
++++    </div>
++++  );
++++};
+++diff --git a/src/components/Header.tsx b/src/components/Header.tsx
+++index 0b3ca4c..cd5ed46 100644
+++--- a/src/components/Header.tsx
++++++ b/src/components/Header.tsx
+++@@ -1,5 +1,5 @@
+++ import React, { useState } from 'react';
+++-import { Flame, Diamond, Cloud, ChevronLeft, ChevronRight, Settings, Smartphone, Award, User, RefreshCw } from 'lucide-react';
++++import { Flame, Diamond, Cloud, ChevronLeft, ChevronRight, Settings, Smartphone, Award, User, RefreshCw, Package } from 'lucide-react';
+++ import { UserProfile } from '../types';
+++ import { PWAInstallButton } from './PWAInstallButton';
+++ 
+++@@ -11,6 +11,7 @@ interface HeaderProps {
+++   onToday: () => void;
+++   onOpenSyncModal: () => void;
+++   onOpenProfileModal: () => void;
++++  onOpenApkModal: () => void;
+++   isSyncing?: boolean;
+++ }
+++ 
+++@@ -22,6 +23,7 @@ export const Header: React.FC<HeaderProps> = ({
+++   onToday,
+++   onOpenSyncModal,
+++   onOpenProfileModal,
++++  onOpenApkModal,
+++   isSyncing,
+++ }) => {
+++   return (
+++@@ -63,7 +65,7 @@ export const Header: React.FC<HeaderProps> = ({
+++           </div>
+++         </div>
+++ 
+++-        {/* Right: Date, Cloud & PWA install */}
++++        {/* Right: Date, Cloud & PWA/APK install */}
+++         <div className="flex items-center gap-2">
+++           {/* Cloud sync button */}
+++           <button
+++@@ -75,8 +77,16 @@ export const Header: React.FC<HeaderProps> = ({
+++             <span className="hidden sm:inline">Bulut</span>
+++           </button>
+++ 
+++-          {/* PWA / APK install */}
+++-          <PWAInstallButton variant="badge" />
++++          {/* APK Export & Install button */}
++++          <button
++++            onClick={onOpenApkModal}
++++            id="btn-header-apk-export"
++++            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-bold text-xs shadow-md shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer"
++++            title="APK İndir / Telefona Yükle"
++++          >
++++            <Package className="w-3.5 h-3.5" />
++++            <span>APK İndir</span>
++++          </button>
+++ 
+++           {/* Profile settings button */}
+++           <button
+++diff --git a/src/components/PWAInstallButton.tsx b/src/components/PWAInstallButton.tsx
+++index 01934da..a0cfd3f 100644
+++--- a/src/components/PWAInstallButton.tsx
++++++ b/src/components/PWAInstallButton.tsx
+++@@ -1,6 +1,7 @@
+++ import React, { useState } from 'react';
+++ import { usePWAInstall } from '../hooks/usePWAInstall';
+++-import { Download, Smartphone, Apple, X, CheckCircle2, Share2, PlusSquare } from 'lucide-react';
++++import { Download, Smartphone, Apple, X, CheckCircle2, Share2, PlusSquare, Package } from 'lucide-react';
++++import { ApkExportModal } from './ApkExportModal';
+++ 
+++ interface PWAInstallProps {
+++   variant?: 'badge' | 'button' | 'card';
+++@@ -9,22 +10,13 @@ interface PWAInstallProps {
+++ export const PWAInstallButton: React.FC<PWAInstallProps> = ({ variant = 'badge' }) => {
+++   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
+++   const [showGuide, setShowGuide] = useState(false);
+++-
+++-  // If already installed and running standalone
+++-  if (isInstalled) {
+++-    return (
+++-      <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full text-xs font-medium">
+++-        <CheckCircle2 className="w-3.5 h-3.5" />
+++-        <span>Uygulama Yüklü</span>
+++-      </div>
+++-    );
+++-  }
++++  const [showApkExport, setShowApkExport] = useState(false);
+++ 
+++   const handleClick = () => {
+++     if (isInstallable) {
+++       install();
+++     } else {
+++-      setShowGuide(true);
++++      setShowApkExport(true);
+++     }
+++   };
+++ 
+++@@ -38,107 +30,39 @@ export const PWAInstallButton: React.FC<PWAInstallProps> = ({ variant = 'badge'
+++           title="Uygulamayı APK veya iOS olarak yükle"
+++         >
+++           <Download className="w-3.5 h-3.5" />
+++-          <span>APK / Uygulamayı Yükle</span>
++++          <span>APK / Yükle</span>
+++         </button>
+++       ) : variant === 'card' ? (
+++         <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/40 border border-emerald-500/20 flex items-center justify-between gap-3">
+++           <div className="flex items-center gap-3">
+++             <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+++-              <Smartphone className="w-5 h-5" />
++++              <Package className="w-5 h-5" />
+++             </div>
+++             <div>
+++-              <h4 className="text-sm font-semibold text-white">Telefona Uygulama Olarak Kur</h4>
+++-              <p className="text-xs text-slate-400">Android APK ve iPhone Safari tam ekran desteği</p>
++++              <h4 className="text-sm font-semibold text-white">APK & Mobil Kurulum</h4>
++++              <p className="text-xs text-slate-400">Android APK indirme ve iPhone Safari tam ekran desteği</p>
+++             </div>
+++           </div>
+++           <button
+++-            onClick={handleClick}
++++            onClick={() => setShowApkExport(true)}
+++             className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl shadow transition active:scale-95"
+++           >
+++-            Yükle
++++            APK İndir
+++           </button>
+++         </div>
+++       ) : (
+++         <button
+++-          onClick={handleClick}
++++          onClick={() => setShowApkExport(true)}
+++           id="btn-pwa-install-main"
+++           className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/20 active:scale-95 transition cursor-pointer"
+++         >
+++           <Download className="w-4 h-4" />
+++-          <span>Telefona Yükle (APK / Safari)</span>
++++          <span>APK İhracat / İndir</span>
+++         </button>
+++       )}
+++ 
+++-      {/* Guide Modal for iOS Safari & Android instructions */}
+++-      {showGuide && (
+++-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in">
+++-          <div className="w-full max-w-md rounded-3xl bg-slate-900 border border-slate-700 p-6 shadow-2xl text-slate-100 relative">
+++-            <button
+++-              onClick={() => setShowGuide(false)}
+++-              className="absolute top-4 right-4 p-2 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition"
+++-            >
+++-              <X className="w-5 h-5" />
+++-            </button>
+++-
+++-            <div className="flex items-center gap-3 mb-4">
+++-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 to-cyan-500 p-0.5 flex items-center justify-center">
+++-                <img src="/icon.svg" alt="Willy" className="w-full h-full rounded-[14px]" />
+++-              </div>
+++-              <div>
+++-                <h3 className="text-lg font-bold text-white">Willy Kilo Takip Kurulumu</h3>
+++-                <p className="text-xs text-emerald-400">Android APK & Apple Safari Uyumlu PWA</p>
+++-              </div>
+++-            </div>
+++-
+++-            <div className="space-y-4 my-4">
+++-              {/* iOS Safari instructions */}
+++-              <div className="p-3.5 rounded-2xl bg-slate-800/80 border border-slate-700">
+++-                <div className="flex items-center gap-2 text-sm font-semibold text-white mb-2">
+++-                  <Apple className="w-4 h-4 text-emerald-400" />
+++-                  <span>iPhone / iPad (Apple Safari):</span>
+++-                </div>
+++-                <ol className="text-xs text-slate-300 space-y-2 list-decimal list-inside pl-1">
+++-                  <li className="leading-relaxed">
+++-                    Safari alt çubuğundaki <span className="inline-flex items-center gap-1 font-semibold text-white"><Share2 className="w-3.5 h-3.5 text-blue-400" /> Paylaş</span> butonuna dokunun.
+++-                  </li>
+++-                  <li className="leading-relaxed">
+++-                    Açılan menüde aşağı kaydırıp <span className="inline-flex items-center gap-1 font-semibold text-emerald-400"><PlusSquare className="w-3.5 h-3.5" /> Ana Ekrana Ekle</span> seçeneğine basın.
+++-                  </li>
+++-                  <li className="leading-relaxed">
+++-                    Sağ üstteki <strong className="text-white">"Ekle"</strong> düğmesine dokunun. Willy tam bir iOS uygulaması olarak açılacaktır!
+++-                  </li>
+++-                </ol>
+++-              </div>
+++-
+++-              {/* Android instructions */}
+++-              <div className="p-3.5 rounded-2xl bg-slate-800/80 border border-slate-700">
+++-                <div className="flex items-center gap-2 text-sm font-semibold text-white mb-2">
+++-                  <Smartphone className="w-4 h-4 text-cyan-400" />
+++-                  <span>Android (Chrome / Samsung Internet):</span>
+++-                </div>
+++-                <ol className="text-xs text-slate-300 space-y-2 list-decimal list-inside pl-1">
+++-                  <li className="leading-relaxed">
+++-                    Chrome sağ üstündeki <strong className="text-white">üç noktaya (⋮)</strong> dokunun.
+++-                  </li>
+++-                  <li className="leading-relaxed">
+++-                    <strong className="text-cyan-400">"Uygulamayı Yükle"</strong> veya <strong className="text-cyan-400">"Ana Ekrana Ekle"</strong> seçeneğini seçin.
+++-                  </li>
+++-                  <li className="leading-relaxed">
+++-                    Willy doğrudan ana ekranınızda bağımsız APK / WebApp olarak çalışmaya başlar.
+++-                  </li>
+++-                </ol>
+++-              </div>
+++-            </div>
+++-
+++-            <button
+++-              onClick={() => setShowGuide(false)}
+++-              className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/20 active:scale-95 transition"
+++-            >
+++-              Anladım, Harika!
+++-            </button>
+++-          </div>
+++-        </div>
+++-      )}
++++      {/* APK Export & Download Modal */}
++++      <ApkExportModal isOpen={showApkExport} onClose={() => setShowApkExport(false)} />
+++     </>
+++   );
+++ };
+++diff --git a/src/main.tsx b/src/main.tsx
+++index 080dac3..c9f1840 100644
+++--- a/src/main.tsx
++++++ b/src/main.tsx
+++@@ -3,8 +3,16 @@ import {createRoot} from 'react-dom/client';
+++ import App from './App.tsx';
+++ import './index.css';
+++ 
++++// Register Service Worker for PWA / WebAPK support
++++if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
++++  window.addEventListener('load', () => {
++++    navigator.serviceWorker.register('/sw.js').catch(() => {});
++++  });
++++}
++++
+++ createRoot(document.getElementById('root')!).render(
+++   <StrictMode>
+++     <App />
+++   </StrictMode>,
+++ );
++++
+++-- 
+++2.34.1
+++
++diff --git a/public/sw.js b/public/sw.js
++new file mode 100644
++index 0000000..fb48bcb
++--- /dev/null
+++++ b/public/sw.js
++@@ -0,0 +1,56 @@
+++// Service Worker for Willy Kilo Takip PWA
+++const CACHE_NAME = 'willy-kilo-cache-v1';
+++const ASSETS_TO_CACHE = [
+++  '/',
+++  '/index.html',
+++  '/manifest.json',
+++  '/manifest.webmanifest',
+++  '/pwa-192x192.png',
+++  '/pwa-512x512.png',
+++  '/icon.svg'
+++];
+++
+++self.addEventListener('install', (event) => {
+++  event.waitUntil(
+++    caches.open(CACHE_NAME).then((cache) => {
+++      return cache.addAll(ASSETS_TO_CACHE).catch(() => {});
+++    })
+++  );
+++  self.skipWaiting();
+++});
+++
+++self.addEventListener('activate', (event) => {
+++  event.waitUntil(
+++    caches.keys().then((keys) => {
+++      return Promise.all(
+++        keys.map((key) => {
+++          if (key !== CACHE_NAME) {
+++            return caches.delete(key);
+++          }
+++        })
+++      );
+++    })
+++  );
+++  self.clients.claim();
+++});
+++
+++self.addEventListener('fetch', (event) => {
+++  if (event.request.method !== 'GET') return;
+++  // Skip API or Google fonts caching failures
+++  if (event.request.url.includes('/api/')) return;
+++
+++  event.respondWith(
+++    caches.match(event.request).then((cachedResponse) => {
+++      if (cachedResponse) {
+++        return cachedResponse;
+++      }
+++      return fetch(event.request).then((networkResponse) => {
+++        return networkResponse;
+++      }).catch(() => {
+++        if (event.request.mode === 'navigate') {
+++          return caches.match('/');
+++        }
+++      });
+++    })
+++  );
+++});
++diff --git a/server.ts b/server.ts
++index 18d9c7f..e0cfa9c 100644
++--- a/server.ts
+++++ b/server.ts
++@@ -1,15 +1,12 @@
++ import express from 'express';
++ import path from 'path';
++ import fs from 'fs';
++-import { fileURLToPath } from 'url';
++ import { GoogleGenAI } from '@google/genai';
++ import { createServer as createViteServer } from 'vite';
++ 
++-const __filename = fileURLToPath(import.meta.url);
++-const __dirname = path.dirname(__filename);
++-
++ const app = express();
++-const PORT = 3000;
+++// Support Render / cloud hosting dynamic port assignment, with default fallback to 3000 for local & AI Studio
+++const PORT = process.env.RENDER ? (Number(process.env.PORT) || 10000) : (process.env.NODE_ENV === 'production' && process.env.PORT && process.env.PORT !== '8080' ? Number(process.env.PORT) : 3000);
++ 
++ // Middleware for parsing large JSON payloads (food photos)
++ app.use(express.json({ limit: '20mb' }));
++diff --git a/src/App.tsx b/src/App.tsx
++index 09eb524..93d3f1d 100644
++--- a/src/App.tsx
+++++ b/src/App.tsx
++@@ -28,6 +28,7 @@ import { WeightTab } from './components/WeightTab';
++ import { WillyCoachTab } from './components/WillyCoachTab';
++ import { CloudSyncModal } from './components/CloudSyncModal';
++ import { ProfileModal } from './components/ProfileModal';
+++import { ApkExportModal } from './components/ApkExportModal';
++ import { OfflineIndicator } from './components/OfflineIndicator';
++ import { PWAInstallButton } from './components/PWAInstallButton';
++ 
++@@ -52,6 +53,7 @@ export function App() {
++   const [targetMeal, setTargetMeal] = useState<MealType>('breakfast');
++   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
++   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+++  const [isApkModalOpen, setIsApkModalOpen] = useState(false);
++   const [isSyncing, setIsSyncing] = useState(false);
++   const [lastSyncTimestamp, setLastSyncTimestamp] = useState<number>(Date.now());
++ 
++@@ -342,6 +344,7 @@ export function App() {
++         onToday={handleToday}
++         onOpenSyncModal={() => setIsSyncModalOpen(true)}
++         onOpenProfileModal={() => setIsProfileModalOpen(true)}
+++        onOpenApkModal={() => setIsApkModalOpen(true)}
++         isSyncing={isSyncing}
++       />
++ 
++@@ -460,6 +463,12 @@ export function App() {
++         onSaveProfile={(updated) => setProfile(updated)}
++       />
++ 
+++      {/* APK Export & Download Modal */}
+++      <ApkExportModal
+++        isOpen={isApkModalOpen}
+++        onClose={() => setIsApkModalOpen(false)}
+++      />
+++
++       {/* PWA Offline indicator */}
++       <OfflineIndicator />
++     </div>
++diff --git a/src/components/ApkExportModal.tsx b/src/components/ApkExportModal.tsx
++new file mode 100644
++index 0000000..4411507
++--- /dev/null
+++++ b/src/components/ApkExportModal.tsx
++@@ -0,0 +1,389 @@
+++import React, { useState } from 'react';
+++import { Download, Smartphone, Globe, ExternalLink, QrCode, Check, Copy, Package, ShieldCheck, X, Terminal, FileCode2, Play } from 'lucide-react';
+++
+++interface ApkExportModalProps {
+++  isOpen: boolean;
+++  onClose: () => void;
+++}
+++
+++export const ApkExportModal: React.FC<ApkExportModalProps> = ({ isOpen, onClose }) => {
+++  const [activeTab, setActiveTab] = useState<'terminal' | 'pwabuilder' | 'webapk' | 'capacitor' | 'qr'>('terminal');
+++  const [copiedUrl, setCopiedUrl] = useState(false);
+++  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+++
+++  if (!isOpen) return null;
+++
+++  const currentUrl = typeof window !== 'undefined' ? window.location.origin : 'https://willy-kilo-takip.app';
+++  const pwaBuilderUrl = `https://www.pwabuilder.com/?url=${encodeURIComponent(currentUrl)}`;
+++
+++  const handleCopyUrl = () => {
+++    navigator.clipboard.writeText(currentUrl);
+++    setCopiedUrl(true);
+++    setTimeout(() => setCopiedUrl(false), 2000);
+++  };
+++
+++  const copyText = (text: string, id: string) => {
+++    navigator.clipboard.writeText(text);
+++    setCopiedCode(id);
+++    setTimeout(() => setCopiedCode(null), 2000);
+++  };
+++
+++  const terminalDevCommands = `# 1. Proje klasörüne girin:
+++cd willy-kilo-takip
+++
+++# 2. Bağımlılıkları yükleyin:
+++npm install
+++
+++# 3. Ortam değişkenini ayarlayın (Opsiyonel - AI için):
+++cp .env.example .env
+++# .env dosyasını açıp GEMINI_API_KEY ekleyebilirsiniz.
+++
+++# 4. Geliştirme sunucusunu başlatın:
+++npm run dev
+++
+++# Uygulama http://localhost:3000 adresinde anında açılır!`;
+++
+++  const terminalBubblewrapCommands = `# Google'ın resmi Bubblewrap CLI aracı ile terminalden tek adımda APK derleme:
+++# 1. Bubblewrap CLI kurulumu (Node.js gerektirir):
+++npm install -g @bubblewrap/cli
+++
+++# 2. Canlı manifest adresinizden projeyi başlatın:
+++npx @bubblewrap/cli init --manifest="${currentUrl}/manifest.webmanifest"
+++
+++# 3. İmzalı APK'yı tek komutla oluşturun:
+++npx @bubblewrap/cli build
+++
+++# Çıktı: Klasörünüzde doğrudan yüklenebilir 'app-release-signed.apk' üretilir!`;
+++
+++  const capacitorCommands = `# Capacitor ile yerel Android Studio projesi oluşturup APK alma:
+++npm install @capacitor/core @capacitor/cli @capacitor/android
+++
+++# Projeyi başlatın:
+++npx cap init "Willy Kilo Takip" com.willy.kilotakip --web-dir dist
+++
+++# Android platformunu ekleyin:
+++npx cap add android
+++
+++# Projeyi derleyin ve Android klasörüne kopyalayın:
+++npm run build
+++npx cap sync android
+++
+++# Android Studio'yu açıp APK üretin (Build > Build APK):
+++npx cap open android`;
+++
+++  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(currentUrl)}&bgcolor=0f172a&color=34d399&margin=10`;
+++
+++  return (
+++    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
+++      <div className="w-full max-w-xl rounded-3xl bg-slate-900 border border-slate-700 max-h-[92vh] flex flex-col shadow-2xl text-slate-100 overflow-hidden">
+++        {/* Header */}
+++        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
+++          <div className="flex items-center gap-3">
+++            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 to-cyan-500 p-0.5 shadow-md shadow-emerald-500/20">
+++              <div className="w-full h-full rounded-[14px] bg-slate-950 flex items-center justify-center text-emerald-400">
+++                <Terminal className="w-5 h-5" />
+++              </div>
+++            </div>
+++            <div>
+++              <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+++                Terminal Kurulum & APK Merkezi
+++                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+++                  CLI & Android
+++                </span>
+++              </h3>
+++              <p className="text-xs text-slate-400">Projeyi bilgisayarınızda veya terminalde çalıştırma rehberi</p>
+++            </div>
+++          </div>
+++          <button
+++            onClick={onClose}
+++            className="p-2 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition"
+++          >
+++            <X className="w-5 h-5" />
+++          </button>
+++        </div>
+++
+++        {/* Tab Selection */}
+++        <div className="flex border-b border-slate-800 bg-slate-950/40 px-6 pt-2 gap-2 overflow-x-auto">
+++          <button
+++            onClick={() => setActiveTab('terminal')}
+++            className={`pb-3 px-3 text-xs font-semibold whitespace-nowrap border-b-2 transition ${
+++              activeTab === 'terminal'
+++                ? 'border-emerald-400 text-emerald-400'
+++                : 'border-transparent text-slate-400 hover:text-slate-200'
+++            }`}
+++          >
+++            💻 1. Terminal Kurulumu
+++          </button>
+++
+++          <button
+++            onClick={() => setActiveTab('pwabuilder')}
+++            className={`pb-3 px-3 text-xs font-semibold whitespace-nowrap border-b-2 transition ${
+++              activeTab === 'pwabuilder'
+++                ? 'border-emerald-400 text-emerald-400'
+++                : 'border-transparent text-slate-400 hover:text-slate-200'
+++            }`}
+++          >
+++            ⚡ 2. Hızlı APK (PWABuilder)
+++          </button>
+++
+++          <button
+++            onClick={() => setActiveTab('webapk')}
+++            className={`pb-3 px-3 text-xs font-semibold whitespace-nowrap border-b-2 transition ${
+++              activeTab === 'webapk'
+++                ? 'border-emerald-400 text-emerald-400'
+++                : 'border-transparent text-slate-400 hover:text-slate-200'
+++            }`}
+++          >
+++            📱 3. Doğrudan WebAPK
+++          </button>
+++
+++          <button
+++            onClick={() => setActiveTab('capacitor')}
+++            className={`pb-3 px-3 text-xs font-semibold whitespace-nowrap border-b-2 transition ${
+++              activeTab === 'capacitor'
+++                ? 'border-emerald-400 text-emerald-400'
+++                : 'border-transparent text-slate-400 hover:text-slate-200'
+++            }`}
+++          >
+++            🛠️ 4. Terminalden APK Derleme
+++          </button>
+++
+++          <button
+++            onClick={() => setActiveTab('qr')}
+++            className={`pb-3 px-3 text-xs font-semibold whitespace-nowrap border-b-2 transition ${
+++              activeTab === 'qr'
+++                ? 'border-emerald-400 text-emerald-400'
+++                : 'border-transparent text-slate-400 hover:text-slate-200'
+++            }`}
+++          >
+++            📷 5. QR Tara
+++          </button>
+++        </div>
+++
+++        {/* Tab Content */}
+++        <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
+++          {/* TAB 1: TERMINAL KURULUMU */}
+++          {activeTab === 'terminal' && (
+++            <div className="space-y-4">
+++              <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-900 border border-emerald-500/30 space-y-3">
+++                <div className="flex items-center justify-between">
+++                  <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+++                    <Terminal className="w-4 h-4" />
+++                    <span>Lokal Bilgisayarda Terminal Kurulum Adımları</span>
+++                  </div>
+++                  <button
+++                    onClick={() => copyText(terminalDevCommands, 'dev')}
+++                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-[11px] flex items-center gap-1 transition"
+++                  >
+++                    {copiedCode === 'dev' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+++                    <span>{copiedCode === 'dev' ? 'Kopyalandı' : 'Kopyala'}</span>
+++                  </button>
+++                </div>
+++
+++                <p className="text-slate-300 leading-relaxed">
+++                  Projeyi sağ üst köşedeki menüden <strong>Export to ZIP</strong> ile bilgisayarınıza indirdikten sonra veya terminalinizde şu komutları sırayla çalıştırın:
+++                </p>
+++
+++                <pre className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 text-[11px] font-mono text-emerald-300 overflow-x-auto leading-relaxed select-all">
+++                  {terminalDevCommands}
+++                </pre>
+++              </div>
+++
+++              {/* Requirements */}
+++              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+++                <span className="text-white font-bold block">Sistem Gereksinimleri & Notlar:</span>
+++                <ul className="space-y-1.5 text-slate-400 list-disc list-inside">
+++                  <li><strong className="text-slate-200">Node.js:</strong> v18.0.0 veya üzeri (v20+ tavsiye edilir).</li>
+++                  <li><strong className="text-slate-200">Port:</strong> Uygulama varsayılan olarak <code className="text-cyan-400">http://localhost:3000</code> portunda başlar.</li>
+++                  <li><strong className="text-slate-200">Üretim Derlemesi:</strong> <code className="text-emerald-400">npm run build</code> komutu hem Vite frontend'i hem de Node backend'i tek tıkla derler.</li>
+++                  <li><strong className="text-slate-200">Üretim Başlatma:</strong> <code className="text-emerald-400">npm start</code> ile canlıya alınabilir.</li>
+++                </ul>
+++              </div>
+++            </div>
+++          )}
+++
+++          {/* TAB 2: PWABUILDER */}
+++          {activeTab === 'pwabuilder' && (
+++            <div className="space-y-4">
+++              <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-900 border border-emerald-500/30 space-y-3">
+++                <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+++                  <Package className="w-4 h-4" />
+++                  <span>PWABuilder ile Doğrudan .APK Dosyası Üretin</span>
+++                </div>
+++                <p className="text-slate-300 leading-relaxed">
+++                  Willy Kilo Takip, tüm Android gereksinimlerini ve Manifest / Servis Çalışanı (Service Worker) standartlarını karşılamaktadır. <strong>PWABuilder</strong> resmi aracı ile tek tıkla imzalı <code>.apk</code> veya Google Play Store için <code>.aab</code> paketi indirebilirsiniz.
+++                </p>
+++
+++                <div className="space-y-2 pt-1">
+++                  <label className="text-slate-400 block font-medium">Uygulamanızın Canlı URL Bağlantısı:</label>
+++                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-950 border border-slate-700">
+++                    <Globe className="w-4 h-4 text-cyan-400 shrink-0" />
+++                    <span className="flex-1 font-mono text-cyan-300 truncate select-all">{currentUrl}</span>
+++                    <button
+++                      onClick={handleCopyUrl}
+++                      className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold flex items-center gap-1 transition"
+++                    >
+++                      {copiedUrl ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+++                      <span>{copiedUrl ? 'Kopyalandı' : 'Kopyala'}</span>
+++                    </button>
+++                  </div>
+++                </div>
+++
+++                <a
+++                  href={pwaBuilderUrl}
+++                  target="_blank"
+++                  rel="noopener noreferrer"
+++                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 active:scale-95 transition"
+++                >
+++                  <span>PWABuilder'da APK Oluştur & İndir</span>
+++                  <ExternalLink className="w-4 h-4" />
+++                </a>
+++              </div>
+++
+++              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
+++                <span className="text-white font-bold block">Adım Adım APK İndirme:</span>
+++                <ol className="list-decimal list-inside space-y-1.5 text-slate-400 pl-1">
+++                  <li>Yukarıdaki butona tıklayarak PWABuilder'ı açın (URL'niz otomatik doldurulacaktır).</li>
+++                  <li>Sayfanın üstündeki <strong>"Package for Stores"</strong> veya <strong>"Android"</strong> sekmesine tıklayın.</li>
+++                  <li><strong>"Generate APK"</strong> butonuna basın; birkaç saniye içinde <code>Willy-Kilo-Takip.apk</code> cihazınıza inecektir.</li>
+++                  <li>İnen APK dosyasını Android telefonunuza kurup kullanmaya başlayın!</li>
+++                </ol>
+++              </div>
+++            </div>
+++          )}
+++
+++          {/* TAB 3: WEBAPK */}
+++          {activeTab === 'webapk' && (
+++            <div className="space-y-4">
+++              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+++                <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm">
+++                  <Smartphone className="w-4 h-4" />
+++                  <span>Google Chrome Otomatik WebAPK Teknolojisi</span>
+++                </div>
+++                <p className="text-slate-300 leading-relaxed">
+++                  Android cihazlarda Google Chrome ve Samsung Internet tarayıcıları, PWA uygulamalarını doğrudan işletim sistemi düzeyinde gerçek bir <strong>WebAPK</strong> paketine dönüştürür.
+++                </p>
+++
+++                <div className="space-y-2.5 pt-2">
+++                  <div className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-900 border border-slate-800">
+++                    <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">1</span>
+++                    <p className="text-slate-300">
+++                      Android telefonunuzda Chrome tarayıcısını açıp bu uygulamanın bağlantısını açın.
+++                    </p>
+++                  </div>
+++
+++                  <div className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-900 border border-slate-800">
+++                    <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">2</span>
+++                    <p className="text-slate-300">
+++                      Üst bardaki <strong>"APK İndir"</strong> butonuna veya tarayıcı menüsünden <strong>"Uygulamayı Yükle"</strong> seçeneğine dokunun.
+++                    </p>
+++                  </div>
+++
+++                  <div className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-900 border border-slate-800">
+++                    <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">3</span>
+++                    <p className="text-slate-300">
+++                      Android Play Services telefonunuza yerel bir APK paketi kurar. Uygulama bildirim çekmecesinde, uygulama çekmecesinde ve ayarlar menüsünde bağımsız bir yerel Android uygulaması olarak çalışır!
+++                    </p>
+++                  </div>
+++                </div>
+++              </div>
+++            </div>
+++          )}
+++
+++          {/* TAB 4: TERMINAL APK BUILD (Bubblewrap & Capacitor) */}
+++          {activeTab === 'capacitor' && (
+++            <div className="space-y-4">
+++              {/* Option A: Bubblewrap CLI */}
+++              <div className="p-4 rounded-2xl bg-gradient-to-br from-cyan-950/30 via-slate-900 to-slate-900 border border-cyan-500/30 space-y-2.5">
+++                <div className="flex items-center justify-between">
+++                  <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm">
+++                    <Terminal className="w-4 h-4" />
+++                    <span>A) Google Bubblewrap CLI ile Tek Komutta APK</span>
+++                  </div>
+++                  <button
+++                    onClick={() => copyText(terminalBubblewrapCommands, 'bubblewrap')}
+++                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-[11px] flex items-center gap-1 transition"
+++                  >
+++                    {copiedCode === 'bubblewrap' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+++                    <span>{copiedCode === 'bubblewrap' ? 'Kopyalandı' : 'Kopyala'}</span>
+++                  </button>
+++                </div>
+++                <p className="text-slate-300">Android Studio kurmaya gerek kalmadan, doğrudan terminal üzerinden imzalı APK üretir:</p>
+++                <pre className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-[11px] font-mono text-cyan-300 overflow-x-auto leading-relaxed">
+++                  {terminalBubblewrapCommands}
+++                </pre>
+++              </div>
+++
+++              {/* Option B: Capacitor CLI */}
+++              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2.5">
+++                <div className="flex items-center justify-between">
+++                  <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+++                    <Package className="w-4 h-4" />
+++                    <span>B) Capacitor & Android Studio ile APK Derleme</span>
+++                  </div>
+++                  <button
+++                    onClick={() => copyText(capacitorCommands, 'capacitor')}
+++                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-[11px] flex items-center gap-1 transition"
+++                  >
+++                    {copiedCode === 'capacitor' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+++                    <span>{copiedCode === 'capacitor' ? 'Kopyalandı' : 'Kopyala'}</span>
+++                  </button>
+++                </div>
+++                <pre className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-[11px] font-mono text-emerald-300 overflow-x-auto leading-relaxed">
+++                  {capacitorCommands}
+++                </pre>
+++              </div>
+++            </div>
+++          )}
+++
+++          {/* TAB 5: QR CODE */}
+++          {activeTab === 'qr' && (
+++            <div className="flex flex-col items-center justify-center space-y-4 py-2">
+++              <div className="p-3 bg-slate-950 rounded-3xl border border-emerald-500/30 shadow-xl">
+++                <img
+++                  src={qrImageUrl}
+++                  alt="Willy Kilo Takip QR Code"
+++                  className="w-48 h-48 rounded-2xl object-contain"
+++                />
+++              </div>
+++
+++              <div className="text-center max-w-sm">
+++                <h4 className="text-sm font-bold text-white mb-1">Telefonunuzun Kamerasıyla Tarayın</h4>
+++                <p className="text-xs text-slate-400 leading-relaxed">
+++                  Android veya iPhone kameranızı bu QR koda tutarak uygulamayı doğrudan telefonunuzda açabilir ve tek tıkla ana ekranınıza APK / PWA olarak yükleyebilirsiniz.
+++                </p>
+++              </div>
+++
+++              <div className="flex items-center gap-2 p-2 rounded-xl bg-slate-950 border border-slate-800 text-xs">
+++                <Globe className="w-3.5 h-3.5 text-cyan-400" />
+++                <span className="text-slate-300 font-mono select-all text-[11px]">{currentUrl}</span>
+++                <button
+++                  onClick={handleCopyUrl}
+++                  className="p-1 text-slate-400 hover:text-white"
+++                  title="Kopyala"
+++                >
+++                  {copiedUrl ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+++                </button>
+++              </div>
+++            </div>
+++          )}
+++        </div>
+++
+++        {/* Footer */}
+++        <div className="p-4 border-t border-slate-800 bg-slate-950/60 flex items-center justify-between">
+++          <div className="flex items-center gap-2 text-[11px] text-slate-400">
+++            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+++            <span>Terminal & Node.js v18+ Uyumlu</span>
+++          </div>
+++
+++          <button
+++            onClick={onClose}
+++            className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition"
+++          >
+++            Kapat
+++          </button>
+++        </div>
+++      </div>
+++    </div>
+++  );
+++};
++diff --git a/src/components/Header.tsx b/src/components/Header.tsx
++index 0b3ca4c..cd5ed46 100644
++--- a/src/components/Header.tsx
+++++ b/src/components/Header.tsx
++@@ -1,5 +1,5 @@
++ import React, { useState } from 'react';
++-import { Flame, Diamond, Cloud, ChevronLeft, ChevronRight, Settings, Smartphone, Award, User, RefreshCw } from 'lucide-react';
+++import { Flame, Diamond, Cloud, ChevronLeft, ChevronRight, Settings, Smartphone, Award, User, RefreshCw, Package } from 'lucide-react';
++ import { UserProfile } from '../types';
++ import { PWAInstallButton } from './PWAInstallButton';
++ 
++@@ -11,6 +11,7 @@ interface HeaderProps {
++   onToday: () => void;
++   onOpenSyncModal: () => void;
++   onOpenProfileModal: () => void;
+++  onOpenApkModal: () => void;
++   isSyncing?: boolean;
++ }
++ 
++@@ -22,6 +23,7 @@ export const Header: React.FC<HeaderProps> = ({
++   onToday,
++   onOpenSyncModal,
++   onOpenProfileModal,
+++  onOpenApkModal,
++   isSyncing,
++ }) => {
++   return (
++@@ -63,7 +65,7 @@ export const Header: React.FC<HeaderProps> = ({
++           </div>
++         </div>
++ 
++-        {/* Right: Date, Cloud & PWA install */}
+++        {/* Right: Date, Cloud & PWA/APK install */}
++         <div className="flex items-center gap-2">
++           {/* Cloud sync button */}
++           <button
++@@ -75,8 +77,16 @@ export const Header: React.FC<HeaderProps> = ({
++             <span className="hidden sm:inline">Bulut</span>
++           </button>
++ 
++-          {/* PWA / APK install */}
++-          <PWAInstallButton variant="badge" />
+++          {/* APK Export & Install button */}
+++          <button
+++            onClick={onOpenApkModal}
+++            id="btn-header-apk-export"
+++            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-bold text-xs shadow-md shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer"
+++            title="APK İndir / Telefona Yükle"
+++          >
+++            <Package className="w-3.5 h-3.5" />
+++            <span>APK İndir</span>
+++          </button>
++ 
++           {/* Profile settings button */}
++           <button
++diff --git a/src/components/PWAInstallButton.tsx b/src/components/PWAInstallButton.tsx
++index 01934da..a0cfd3f 100644
++--- a/src/components/PWAInstallButton.tsx
+++++ b/src/components/PWAInstallButton.tsx
++@@ -1,6 +1,7 @@
++ import React, { useState } from 'react';
++ import { usePWAInstall } from '../hooks/usePWAInstall';
++-import { Download, Smartphone, Apple, X, CheckCircle2, Share2, PlusSquare } from 'lucide-react';
+++import { Download, Smartphone, Apple, X, CheckCircle2, Share2, PlusSquare, Package } from 'lucide-react';
+++import { ApkExportModal } from './ApkExportModal';
++ 
++ interface PWAInstallProps {
++   variant?: 'badge' | 'button' | 'card';
++@@ -9,22 +10,13 @@ interface PWAInstallProps {
++ export const PWAInstallButton: React.FC<PWAInstallProps> = ({ variant = 'badge' }) => {
++   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
++   const [showGuide, setShowGuide] = useState(false);
++-
++-  // If already installed and running standalone
++-  if (isInstalled) {
++-    return (
++-      <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full text-xs font-medium">
++-        <CheckCircle2 className="w-3.5 h-3.5" />
++-        <span>Uygulama Yüklü</span>
++-      </div>
++-    );
++-  }
+++  const [showApkExport, setShowApkExport] = useState(false);
++ 
++   const handleClick = () => {
++     if (isInstallable) {
++       install();
++     } else {
++-      setShowGuide(true);
+++      setShowApkExport(true);
++     }
++   };
++ 
++@@ -38,107 +30,39 @@ export const PWAInstallButton: React.FC<PWAInstallProps> = ({ variant = 'badge'
++           title="Uygulamayı APK veya iOS olarak yükle"
++         >
++           <Download className="w-3.5 h-3.5" />
++-          <span>APK / Uygulamayı Yükle</span>
+++          <span>APK / Yükle</span>
++         </button>
++       ) : variant === 'card' ? (
++         <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/40 border border-emerald-500/20 flex items-center justify-between gap-3">
++           <div className="flex items-center gap-3">
++             <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
++-              <Smartphone className="w-5 h-5" />
+++              <Package className="w-5 h-5" />
++             </div>
++             <div>
++-              <h4 className="text-sm font-semibold text-white">Telefona Uygulama Olarak Kur</h4>
++-              <p className="text-xs text-slate-400">Android APK ve iPhone Safari tam ekran desteği</p>
+++              <h4 className="text-sm font-semibold text-white">APK & Mobil Kurulum</h4>
+++              <p className="text-xs text-slate-400">Android APK indirme ve iPhone Safari tam ekran desteği</p>
++             </div>
++           </div>
++           <button
++-            onClick={handleClick}
+++            onClick={() => setShowApkExport(true)}
++             className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl shadow transition active:scale-95"
++           >
++-            Yükle
+++            APK İndir
++           </button>
++         </div>
++       ) : (
++         <button
++-          onClick={handleClick}
+++          onClick={() => setShowApkExport(true)}
++           id="btn-pwa-install-main"
++           className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/20 active:scale-95 transition cursor-pointer"
++         >
++           <Download className="w-4 h-4" />
++-          <span>Telefona Yükle (APK / Safari)</span>
+++          <span>APK İhracat / İndir</span>
++         </button>
++       )}
++ 
++-      {/* Guide Modal for iOS Safari & Android instructions */}
++-      {showGuide && (
++-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in">
++-          <div className="w-full max-w-md rounded-3xl bg-slate-900 border border-slate-700 p-6 shadow-2xl text-slate-100 relative">
++-            <button
++-              onClick={() => setShowGuide(false)}
++-              className="absolute top-4 right-4 p-2 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition"
++-            >
++-              <X className="w-5 h-5" />
++-            </button>
++-
++-            <div className="flex items-center gap-3 mb-4">
++-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 to-cyan-500 p-0.5 flex items-center justify-center">
++-                <img src="/icon.svg" alt="Willy" className="w-full h-full rounded-[14px]" />
++-              </div>
++-              <div>
++-                <h3 className="text-lg font-bold text-white">Willy Kilo Takip Kurulumu</h3>
++-                <p className="text-xs text-emerald-400">Android APK & Apple Safari Uyumlu PWA</p>
++-              </div>
++-            </div>
++-
++-            <div className="space-y-4 my-4">
++-              {/* iOS Safari instructions */}
++-              <div className="p-3.5 rounded-2xl bg-slate-800/80 border border-slate-700">
++-                <div className="flex items-center gap-2 text-sm font-semibold text-white mb-2">
++-                  <Apple className="w-4 h-4 text-emerald-400" />
++-                  <span>iPhone / iPad (Apple Safari):</span>
++-                </div>
++-                <ol className="text-xs text-slate-300 space-y-2 list-decimal list-inside pl-1">
++-                  <li className="leading-relaxed">
++-                    Safari alt çubuğundaki <span className="inline-flex items-center gap-1 font-semibold text-white"><Share2 className="w-3.5 h-3.5 text-blue-400" /> Paylaş</span> butonuna dokunun.
++-                  </li>
++-                  <li className="leading-relaxed">
++-                    Açılan menüde aşağı kaydırıp <span className="inline-flex items-center gap-1 font-semibold text-emerald-400"><PlusSquare className="w-3.5 h-3.5" /> Ana Ekrana Ekle</span> seçeneğine basın.
++-                  </li>
++-                  <li className="leading-relaxed">
++-                    Sağ üstteki <strong className="text-white">"Ekle"</strong> düğmesine dokunun. Willy tam bir iOS uygulaması olarak açılacaktır!
++-                  </li>
++-                </ol>
++-              </div>
++-
++-              {/* Android instructions */}
++-              <div className="p-3.5 rounded-2xl bg-slate-800/80 border border-slate-700">
++-                <div className="flex items-center gap-2 text-sm font-semibold text-white mb-2">
++-                  <Smartphone className="w-4 h-4 text-cyan-400" />
++-                  <span>Android (Chrome / Samsung Internet):</span>
++-                </div>
++-                <ol className="text-xs text-slate-300 space-y-2 list-decimal list-inside pl-1">
++-                  <li className="leading-relaxed">
++-                    Chrome sağ üstündeki <strong className="text-white">üç noktaya (⋮)</strong> dokunun.
++-                  </li>
++-                  <li className="leading-relaxed">
++-                    <strong className="text-cyan-400">"Uygulamayı Yükle"</strong> veya <strong className="text-cyan-400">"Ana Ekrana Ekle"</strong> seçeneğini seçin.
++-                  </li>
++-                  <li className="leading-relaxed">
++-                    Willy doğrudan ana ekranınızda bağımsız APK / WebApp olarak çalışmaya başlar.
++-                  </li>
++-                </ol>
++-              </div>
++-            </div>
++-
++-            <button
++-              onClick={() => setShowGuide(false)}
++-              className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/20 active:scale-95 transition"
++-            >
++-              Anladım, Harika!
++-            </button>
++-          </div>
++-        </div>
++-      )}
+++      {/* APK Export & Download Modal */}
+++      <ApkExportModal isOpen={showApkExport} onClose={() => setShowApkExport(false)} />
++     </>
++   );
++ };
++diff --git a/src/main.tsx b/src/main.tsx
++index 080dac3..c9f1840 100644
++--- a/src/main.tsx
+++++ b/src/main.tsx
++@@ -3,8 +3,16 @@ import {createRoot} from 'react-dom/client';
++ import App from './App.tsx';
++ import './index.css';
++ 
+++// Register Service Worker for PWA / WebAPK support
+++if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
+++  window.addEventListener('load', () => {
+++    navigator.serviceWorker.register('/sw.js').catch(() => {});
+++  });
+++}
+++
++ createRoot(document.getElementById('root')!).render(
++   <StrictMode>
++     <App />
++   </StrictMode>,
++ );
+++
++-- 
++2.34.1
++
+diff --git a/public/sw.js b/public/sw.js
+new file mode 100644
+index 0000000..fb48bcb
+--- /dev/null
++++ b/public/sw.js
+@@ -0,0 +1,56 @@
++// Service Worker for Willy Kilo Takip PWA
++const CACHE_NAME = 'willy-kilo-cache-v1';
++const ASSETS_TO_CACHE = [
++  '/',
++  '/index.html',
++  '/manifest.json',
++  '/manifest.webmanifest',
++  '/pwa-192x192.png',
++  '/pwa-512x512.png',
++  '/icon.svg'
++];
++
++self.addEventListener('install', (event) => {
++  event.waitUntil(
++    caches.open(CACHE_NAME).then((cache) => {
++      return cache.addAll(ASSETS_TO_CACHE).catch(() => {});
++    })
++  );
++  self.skipWaiting();
++});
++
++self.addEventListener('activate', (event) => {
++  event.waitUntil(
++    caches.keys().then((keys) => {
++      return Promise.all(
++        keys.map((key) => {
++          if (key !== CACHE_NAME) {
++            return caches.delete(key);
++          }
++        })
++      );
++    })
++  );
++  self.clients.claim();
++});
++
++self.addEventListener('fetch', (event) => {
++  if (event.request.method !== 'GET') return;
++  // Skip API or Google fonts caching failures
++  if (event.request.url.includes('/api/')) return;
++
++  event.respondWith(
++    caches.match(event.request).then((cachedResponse) => {
++      if (cachedResponse) {
++        return cachedResponse;
++      }
++      return fetch(event.request).then((networkResponse) => {
++        return networkResponse;
++      }).catch(() => {
++        if (event.request.mode === 'navigate') {
++          return caches.match('/');
++        }
++      });
++    })
++  );
++});
+diff --git a/server.ts b/server.ts
+index 18d9c7f..e0cfa9c 100644
+--- a/server.ts
++++ b/server.ts
+@@ -1,15 +1,12 @@
+ import express from 'express';
+ import path from 'path';
+ import fs from 'fs';
+-import { fileURLToPath } from 'url';
+ import { GoogleGenAI } from '@google/genai';
+ import { createServer as createViteServer } from 'vite';
+ 
+-const __filename = fileURLToPath(import.meta.url);
+-const __dirname = path.dirname(__filename);
+-
+ const app = express();
+-const PORT = 3000;
++// Support Render / cloud hosting dynamic port assignment, with default fallback to 3000 for local & AI Studio
++const PORT = process.env.RENDER ? (Number(process.env.PORT) || 10000) : (process.env.NODE_ENV === 'production' && process.env.PORT && process.env.PORT !== '8080' ? Number(process.env.PORT) : 3000);
+ 
+ // Middleware for parsing large JSON payloads (food photos)
+ app.use(express.json({ limit: '20mb' }));
+diff --git a/src/App.tsx b/src/App.tsx
+index 09eb524..93d3f1d 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -28,6 +28,7 @@ import { WeightTab } from './components/WeightTab';
+ import { WillyCoachTab } from './components/WillyCoachTab';
+ import { CloudSyncModal } from './components/CloudSyncModal';
+ import { ProfileModal } from './components/ProfileModal';
++import { ApkExportModal } from './components/ApkExportModal';
+ import { OfflineIndicator } from './components/OfflineIndicator';
+ import { PWAInstallButton } from './components/PWAInstallButton';
+ 
+@@ -52,6 +53,7 @@ export function App() {
+   const [targetMeal, setTargetMeal] = useState<MealType>('breakfast');
+   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
++  const [isApkModalOpen, setIsApkModalOpen] = useState(false);
+   const [isSyncing, setIsSyncing] = useState(false);
+   const [lastSyncTimestamp, setLastSyncTimestamp] = useState<number>(Date.now());
+ 
+@@ -342,6 +344,7 @@ export function App() {
+         onToday={handleToday}
+         onOpenSyncModal={() => setIsSyncModalOpen(true)}
+         onOpenProfileModal={() => setIsProfileModalOpen(true)}
++        onOpenApkModal={() => setIsApkModalOpen(true)}
+         isSyncing={isSyncing}
+       />
+ 
+@@ -460,6 +463,12 @@ export function App() {
+         onSaveProfile={(updated) => setProfile(updated)}
+       />
+ 
++      {/* APK Export & Download Modal */}
++      <ApkExportModal
++        isOpen={isApkModalOpen}
++        onClose={() => setIsApkModalOpen(false)}
++      />
++
+       {/* PWA Offline indicator */}
+       <OfflineIndicator />
+     </div>
+diff --git a/src/components/ApkExportModal.tsx b/src/components/ApkExportModal.tsx
+new file mode 100644
+index 0000000..4411507
+--- /dev/null
++++ b/src/components/ApkExportModal.tsx
+@@ -0,0 +1,389 @@
++import React, { useState } from 'react';
++import { Download, Smartphone, Globe, ExternalLink, QrCode, Check, Copy, Package, ShieldCheck, X, Terminal, FileCode2, Play } from 'lucide-react';
++
++interface ApkExportModalProps {
++  isOpen: boolean;
++  onClose: () => void;
++}
++
++export const ApkExportModal: React.FC<ApkExportModalProps> = ({ isOpen, onClose }) => {
++  const [activeTab, setActiveTab] = useState<'terminal' | 'pwabuilder' | 'webapk' | 'capacitor' | 'qr'>('terminal');
++  const [copiedUrl, setCopiedUrl] = useState(false);
++  const [copiedCode, setCopiedCode] = useState<string | null>(null);
++
++  if (!isOpen) return null;
++
++  const currentUrl = typeof window !== 'undefined' ? window.location.origin : 'https://willy-kilo-takip.app';
++  const pwaBuilderUrl = `https://www.pwabuilder.com/?url=${encodeURIComponent(currentUrl)}`;
++
++  const handleCopyUrl = () => {
++    navigator.clipboard.writeText(currentUrl);
++    setCopiedUrl(true);
++    setTimeout(() => setCopiedUrl(false), 2000);
++  };
++
++  const copyText = (text: string, id: string) => {
++    navigator.clipboard.writeText(text);
++    setCopiedCode(id);
++    setTimeout(() => setCopiedCode(null), 2000);
++  };
++
++  const terminalDevCommands = `# 1. Proje klasörüne girin:
++cd willy-kilo-takip
++
++# 2. Bağımlılıkları yükleyin:
++npm install
++
++# 3. Ortam değişkenini ayarlayın (Opsiyonel - AI için):
++cp .env.example .env
++# .env dosyasını açıp GEMINI_API_KEY ekleyebilirsiniz.
++
++# 4. Geliştirme sunucusunu başlatın:
++npm run dev
++
++# Uygulama http://localhost:3000 adresinde anında açılır!`;
++
++  const terminalBubblewrapCommands = `# Google'ın resmi Bubblewrap CLI aracı ile terminalden tek adımda APK derleme:
++# 1. Bubblewrap CLI kurulumu (Node.js gerektirir):
++npm install -g @bubblewrap/cli
++
++# 2. Canlı manifest adresinizden projeyi başlatın:
++npx @bubblewrap/cli init --manifest="${currentUrl}/manifest.webmanifest"
++
++# 3. İmzalı APK'yı tek komutla oluşturun:
++npx @bubblewrap/cli build
++
++# Çıktı: Klasörünüzde doğrudan yüklenebilir 'app-release-signed.apk' üretilir!`;
++
++  const capacitorCommands = `# Capacitor ile yerel Android Studio projesi oluşturup APK alma:
++npm install @capacitor/core @capacitor/cli @capacitor/android
++
++# Projeyi başlatın:
++npx cap init "Willy Kilo Takip" com.willy.kilotakip --web-dir dist
++
++# Android platformunu ekleyin:
++npx cap add android
++
++# Projeyi derleyin ve Android klasörüne kopyalayın:
++npm run build
++npx cap sync android
++
++# Android Studio'yu açıp APK üretin (Build > Build APK):
++npx cap open android`;
++
++  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(currentUrl)}&bgcolor=0f172a&color=34d399&margin=10`;
++
++  return (
++    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
++      <div className="w-full max-w-xl rounded-3xl bg-slate-900 border border-slate-700 max-h-[92vh] flex flex-col shadow-2xl text-slate-100 overflow-hidden">
++        {/* Header */}
++        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
++          <div className="flex items-center gap-3">
++            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 to-cyan-500 p-0.5 shadow-md shadow-emerald-500/20">
++              <div className="w-full h-full rounded-[14px] bg-slate-950 flex items-center justify-center text-emerald-400">
++                <Terminal className="w-5 h-5" />
++              </div>
++            </div>
++            <div>
++              <h3 className="text-base font-extrabold text-white flex items-center gap-2">
++                Terminal Kurulum & APK Merkezi
++                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
++                  CLI & Android
++                </span>
++              </h3>
++              <p className="text-xs text-slate-400">Projeyi bilgisayarınızda veya terminalde çalıştırma rehberi</p>
++            </div>
++          </div>
++          <button
++            onClick={onClose}
++            className="p-2 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition"
++          >
++            <X className="w-5 h-5" />
++          </button>
++        </div>
++
++        {/* Tab Selection */}
++        <div className="flex border-b border-slate-800 bg-slate-950/40 px-6 pt-2 gap-2 overflow-x-auto">
++          <button
++            onClick={() => setActiveTab('terminal')}
++            className={`pb-3 px-3 text-xs font-semibold whitespace-nowrap border-b-2 transition ${
++              activeTab === 'terminal'
++                ? 'border-emerald-400 text-emerald-400'
++                : 'border-transparent text-slate-400 hover:text-slate-200'
++            }`}
++          >
++            💻 1. Terminal Kurulumu
++          </button>
++
++          <button
++            onClick={() => setActiveTab('pwabuilder')}
++            className={`pb-3 px-3 text-xs font-semibold whitespace-nowrap border-b-2 transition ${
++              activeTab === 'pwabuilder'
++                ? 'border-emerald-400 text-emerald-400'
++                : 'border-transparent text-slate-400 hover:text-slate-200'
++            }`}
++          >
++            ⚡ 2. Hızlı APK (PWABuilder)
++          </button>
++
++          <button
++            onClick={() => setActiveTab('webapk')}
++            className={`pb-3 px-3 text-xs font-semibold whitespace-nowrap border-b-2 transition ${
++              activeTab === 'webapk'
++                ? 'border-emerald-400 text-emerald-400'
++                : 'border-transparent text-slate-400 hover:text-slate-200'
++            }`}
++          >
++            📱 3. Doğrudan WebAPK
++          </button>
++
++          <button
++            onClick={() => setActiveTab('capacitor')}
++            className={`pb-3 px-3 text-xs font-semibold whitespace-nowrap border-b-2 transition ${
++              activeTab === 'capacitor'
++                ? 'border-emerald-400 text-emerald-400'
++                : 'border-transparent text-slate-400 hover:text-slate-200'
++            }`}
++          >
++            🛠️ 4. Terminalden APK Derleme
++          </button>
++
++          <button
++            onClick={() => setActiveTab('qr')}
++            className={`pb-3 px-3 text-xs font-semibold whitespace-nowrap border-b-2 transition ${
++              activeTab === 'qr'
++                ? 'border-emerald-400 text-emerald-400'
++                : 'border-transparent text-slate-400 hover:text-slate-200'
++            }`}
++          >
++            📷 5. QR Tara
++          </button>
++        </div>
++
++        {/* Tab Content */}
++        <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
++          {/* TAB 1: TERMINAL KURULUMU */}
++          {activeTab === 'terminal' && (
++            <div className="space-y-4">
++              <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-900 border border-emerald-500/30 space-y-3">
++                <div className="flex items-center justify-between">
++                  <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
++                    <Terminal className="w-4 h-4" />
++                    <span>Lokal Bilgisayarda Terminal Kurulum Adımları</span>
++                  </div>
++                  <button
++                    onClick={() => copyText(terminalDevCommands, 'dev')}
++                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-[11px] flex items-center gap-1 transition"
++                  >
++                    {copiedCode === 'dev' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
++                    <span>{copiedCode === 'dev' ? 'Kopyalandı' : 'Kopyala'}</span>
++                  </button>
++                </div>
++
++                <p className="text-slate-300 leading-relaxed">
++                  Projeyi sağ üst köşedeki menüden <strong>Export to ZIP</strong> ile bilgisayarınıza indirdikten sonra veya terminalinizde şu komutları sırayla çalıştırın:
++                </p>
++
++                <pre className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 text-[11px] font-mono text-emerald-300 overflow-x-auto leading-relaxed select-all">
++                  {terminalDevCommands}
++                </pre>
++              </div>
++
++              {/* Requirements */}
++              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
++                <span className="text-white font-bold block">Sistem Gereksinimleri & Notlar:</span>
++                <ul className="space-y-1.5 text-slate-400 list-disc list-inside">
++                  <li><strong className="text-slate-200">Node.js:</strong> v18.0.0 veya üzeri (v20+ tavsiye edilir).</li>
++                  <li><strong className="text-slate-200">Port:</strong> Uygulama varsayılan olarak <code className="text-cyan-400">http://localhost:3000</code> portunda başlar.</li>
++                  <li><strong className="text-slate-200">Üretim Derlemesi:</strong> <code className="text-emerald-400">npm run build</code> komutu hem Vite frontend'i hem de Node backend'i tek tıkla derler.</li>
++                  <li><strong className="text-slate-200">Üretim Başlatma:</strong> <code className="text-emerald-400">npm start</code> ile canlıya alınabilir.</li>
++                </ul>
++              </div>
++            </div>
++          )}
++
++          {/* TAB 2: PWABUILDER */}
++          {activeTab === 'pwabuilder' && (
++            <div className="space-y-4">
++              <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-900 border border-emerald-500/30 space-y-3">
++                <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
++                  <Package className="w-4 h-4" />
++                  <span>PWABuilder ile Doğrudan .APK Dosyası Üretin</span>
++                </div>
++                <p className="text-slate-300 leading-relaxed">
++                  Willy Kilo Takip, tüm Android gereksinimlerini ve Manifest / Servis Çalışanı (Service Worker) standartlarını karşılamaktadır. <strong>PWABuilder</strong> resmi aracı ile tek tıkla imzalı <code>.apk</code> veya Google Play Store için <code>.aab</code> paketi indirebilirsiniz.
++                </p>
++
++                <div className="space-y-2 pt-1">
++                  <label className="text-slate-400 block font-medium">Uygulamanızın Canlı URL Bağlantısı:</label>
++                  <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-950 border border-slate-700">
++                    <Globe className="w-4 h-4 text-cyan-400 shrink-0" />
++                    <span className="flex-1 font-mono text-cyan-300 truncate select-all">{currentUrl}</span>
++                    <button
++                      onClick={handleCopyUrl}
++                      className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold flex items-center gap-1 transition"
++                    >
++                      {copiedUrl ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
++                      <span>{copiedUrl ? 'Kopyalandı' : 'Kopyala'}</span>
++                    </button>
++                  </div>
++                </div>
++
++                <a
++                  href={pwaBuilderUrl}
++                  target="_blank"
++                  rel="noopener noreferrer"
++                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 active:scale-95 transition"
++                >
++                  <span>PWABuilder'da APK Oluştur & İndir</span>
++                  <ExternalLink className="w-4 h-4" />
++                </a>
++              </div>
++
++              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
++                <span className="text-white font-bold block">Adım Adım APK İndirme:</span>
++                <ol className="list-decimal list-inside space-y-1.5 text-slate-400 pl-1">
++                  <li>Yukarıdaki butona tıklayarak PWABuilder'ı açın (URL'niz otomatik doldurulacaktır).</li>
++                  <li>Sayfanın üstündeki <strong>"Package for Stores"</strong> veya <strong>"Android"</strong> sekmesine tıklayın.</li>
++                  <li><strong>"Generate APK"</strong> butonuna basın; birkaç saniye içinde <code>Willy-Kilo-Takip.apk</code> cihazınıza inecektir.</li>
++                  <li>İnen APK dosyasını Android telefonunuza kurup kullanmaya başlayın!</li>
++                </ol>
++              </div>
++            </div>
++          )}
++
++          {/* TAB 3: WEBAPK */}
++          {activeTab === 'webapk' && (
++            <div className="space-y-4">
++              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
++                <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm">
++                  <Smartphone className="w-4 h-4" />
++                  <span>Google Chrome Otomatik WebAPK Teknolojisi</span>
++                </div>
++                <p className="text-slate-300 leading-relaxed">
++                  Android cihazlarda Google Chrome ve Samsung Internet tarayıcıları, PWA uygulamalarını doğrudan işletim sistemi düzeyinde gerçek bir <strong>WebAPK</strong> paketine dönüştürür.
++                </p>
++
++                <div className="space-y-2.5 pt-2">
++                  <div className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-900 border border-slate-800">
++                    <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">1</span>
++                    <p className="text-slate-300">
++                      Android telefonunuzda Chrome tarayıcısını açıp bu uygulamanın bağlantısını açın.
++                    </p>
++                  </div>
++
++                  <div className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-900 border border-slate-800">
++                    <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">2</span>
++                    <p className="text-slate-300">
++                      Üst bardaki <strong>"APK İndir"</strong> butonuna veya tarayıcı menüsünden <strong>"Uygulamayı Yükle"</strong> seçeneğine dokunun.
++                    </p>
++                  </div>
++
++                  <div className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-900 border border-slate-800">
++                    <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">3</span>
++                    <p className="text-slate-300">
++                      Android Play Services telefonunuza yerel bir APK paketi kurar. Uygulama bildirim çekmecesinde, uygulama çekmecesinde ve ayarlar menüsünde bağımsız bir yerel Android uygulaması olarak çalışır!
++                    </p>
++                  </div>
++                </div>
++              </div>
++            </div>
++          )}
++
++          {/* TAB 4: TERMINAL APK BUILD (Bubblewrap & Capacitor) */}
++          {activeTab === 'capacitor' && (
++            <div className="space-y-4">
++              {/* Option A: Bubblewrap CLI */}
++              <div className="p-4 rounded-2xl bg-gradient-to-br from-cyan-950/30 via-slate-900 to-slate-900 border border-cyan-500/30 space-y-2.5">
++                <div className="flex items-center justify-between">
++                  <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm">
++                    <Terminal className="w-4 h-4" />
++                    <span>A) Google Bubblewrap CLI ile Tek Komutta APK</span>
++                  </div>
++                  <button
++                    onClick={() => copyText(terminalBubblewrapCommands, 'bubblewrap')}
++                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-[11px] flex items-center gap-1 transition"
++                  >
++                    {copiedCode === 'bubblewrap' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
++                    <span>{copiedCode === 'bubblewrap' ? 'Kopyalandı' : 'Kopyala'}</span>
++                  </button>
++                </div>
++                <p className="text-slate-300">Android Studio kurmaya gerek kalmadan, doğrudan terminal üzerinden imzalı APK üretir:</p>
++                <pre className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-[11px] font-mono text-cyan-300 overflow-x-auto leading-relaxed">
++                  {terminalBubblewrapCommands}
++                </pre>
++              </div>
++
++              {/* Option B: Capacitor CLI */}
++              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2.5">
++                <div className="flex items-center justify-between">
++                  <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
++                    <Package className="w-4 h-4" />
++                    <span>B) Capacitor & Android Studio ile APK Derleme</span>
++                  </div>
++                  <button
++                    onClick={() => copyText(capacitorCommands, 'capacitor')}
++                    className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-[11px] flex items-center gap-1 transition"
++                  >
++                    {copiedCode === 'capacitor' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
++                    <span>{copiedCode === 'capacitor' ? 'Kopyalandı' : 'Kopyala'}</span>
++                  </button>
++                </div>
++                <pre className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-[11px] font-mono text-emerald-300 overflow-x-auto leading-relaxed">
++                  {capacitorCommands}
++                </pre>
++              </div>
++            </div>
++          )}
++
++          {/* TAB 5: QR CODE */}
++          {activeTab === 'qr' && (
++            <div className="flex flex-col items-center justify-center space-y-4 py-2">
++              <div className="p-3 bg-slate-950 rounded-3xl border border-emerald-500/30 shadow-xl">
++                <img
++                  src={qrImageUrl}
++                  alt="Willy Kilo Takip QR Code"
++                  className="w-48 h-48 rounded-2xl object-contain"
++                />
++              </div>
++
++              <div className="text-center max-w-sm">
++                <h4 className="text-sm font-bold text-white mb-1">Telefonunuzun Kamerasıyla Tarayın</h4>
++                <p className="text-xs text-slate-400 leading-relaxed">
++                  Android veya iPhone kameranızı bu QR koda tutarak uygulamayı doğrudan telefonunuzda açabilir ve tek tıkla ana ekranınıza APK / PWA olarak yükleyebilirsiniz.
++                </p>
++              </div>
++
++              <div className="flex items-center gap-2 p-2 rounded-xl bg-slate-950 border border-slate-800 text-xs">
++                <Globe className="w-3.5 h-3.5 text-cyan-400" />
++                <span className="text-slate-300 font-mono select-all text-[11px]">{currentUrl}</span>
++                <button
++                  onClick={handleCopyUrl}
++                  className="p-1 text-slate-400 hover:text-white"
++                  title="Kopyala"
++                >
++                  {copiedUrl ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
++                </button>
++              </div>
++            </div>
++          )}
++        </div>
++
++        {/* Footer */}
++        <div className="p-4 border-t border-slate-800 bg-slate-950/60 flex items-center justify-between">
++          <div className="flex items-center gap-2 text-[11px] text-slate-400">
++            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
++            <span>Terminal & Node.js v18+ Uyumlu</span>
++          </div>
++
++          <button
++            onClick={onClose}
++            className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition"
++          >
++            Kapat
++          </button>
++        </div>
++      </div>
++    </div>
++  );
++};
+diff --git a/src/components/Header.tsx b/src/components/Header.tsx
+index 0b3ca4c..cd5ed46 100644
+--- a/src/components/Header.tsx
++++ b/src/components/Header.tsx
+@@ -1,5 +1,5 @@
+ import React, { useState } from 'react';
+-import { Flame, Diamond, Cloud, ChevronLeft, ChevronRight, Settings, Smartphone, Award, User, RefreshCw } from 'lucide-react';
++import { Flame, Diamond, Cloud, ChevronLeft, ChevronRight, Settings, Smartphone, Award, User, RefreshCw, Package } from 'lucide-react';
+ import { UserProfile } from '../types';
+ import { PWAInstallButton } from './PWAInstallButton';
+ 
+@@ -11,6 +11,7 @@ interface HeaderProps {
+   onToday: () => void;
+   onOpenSyncModal: () => void;
+   onOpenProfileModal: () => void;
++  onOpenApkModal: () => void;
+   isSyncing?: boolean;
+ }
+ 
+@@ -22,6 +23,7 @@ export const Header: React.FC<HeaderProps> = ({
+   onToday,
+   onOpenSyncModal,
+   onOpenProfileModal,
++  onOpenApkModal,
+   isSyncing,
+ }) => {
+   return (
+@@ -63,7 +65,7 @@ export const Header: React.FC<HeaderProps> = ({
+           </div>
+         </div>
+ 
+-        {/* Right: Date, Cloud & PWA install */}
++        {/* Right: Date, Cloud & PWA/APK install */}
+         <div className="flex items-center gap-2">
+           {/* Cloud sync button */}
+           <button
+@@ -75,8 +77,16 @@ export const Header: React.FC<HeaderProps> = ({
+             <span className="hidden sm:inline">Bulut</span>
+           </button>
+ 
+-          {/* PWA / APK install */}
+-          <PWAInstallButton variant="badge" />
++          {/* APK Export & Install button */}
++          <button
++            onClick={onOpenApkModal}
++            id="btn-header-apk-export"
++            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-bold text-xs shadow-md shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer"
++            title="APK İndir / Telefona Yükle"
++          >
++            <Package className="w-3.5 h-3.5" />
++            <span>APK İndir</span>
++          </button>
+ 
+           {/* Profile settings button */}
+           <button
+diff --git a/src/components/PWAInstallButton.tsx b/src/components/PWAInstallButton.tsx
+index 01934da..a0cfd3f 100644
+--- a/src/components/PWAInstallButton.tsx
++++ b/src/components/PWAInstallButton.tsx
+@@ -1,6 +1,7 @@
+ import React, { useState } from 'react';
+ import { usePWAInstall } from '../hooks/usePWAInstall';
+-import { Download, Smartphone, Apple, X, CheckCircle2, Share2, PlusSquare } from 'lucide-react';
++import { Download, Smartphone, Apple, X, CheckCircle2, Share2, PlusSquare, Package } from 'lucide-react';
++import { ApkExportModal } from './ApkExportModal';
+ 
+ interface PWAInstallProps {
+   variant?: 'badge' | 'button' | 'card';
+@@ -9,22 +10,13 @@ interface PWAInstallProps {
+ export const PWAInstallButton: React.FC<PWAInstallProps> = ({ variant = 'badge' }) => {
+   const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
+   const [showGuide, setShowGuide] = useState(false);
+-
+-  // If already installed and running standalone
+-  if (isInstalled) {
+-    return (
+-      <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full text-xs font-medium">
+-        <CheckCircle2 className="w-3.5 h-3.5" />
+-        <span>Uygulama Yüklü</span>
+-      </div>
+-    );
+-  }
++  const [showApkExport, setShowApkExport] = useState(false);
+ 
+   const handleClick = () => {
+     if (isInstallable) {
+       install();
+     } else {
+-      setShowGuide(true);
++      setShowApkExport(true);
+     }
+   };
+ 
+@@ -38,107 +30,39 @@ export const PWAInstallButton: React.FC<PWAInstallProps> = ({ variant = 'badge'
+           title="Uygulamayı APK veya iOS olarak yükle"
+         >
+           <Download className="w-3.5 h-3.5" />
+-          <span>APK / Uygulamayı Yükle</span>
++          <span>APK / Yükle</span>
+         </button>
+       ) : variant === 'card' ? (
+         <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/40 border border-emerald-500/20 flex items-center justify-between gap-3">
+           <div className="flex items-center gap-3">
+             <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+-              <Smartphone className="w-5 h-5" />
++              <Package className="w-5 h-5" />
+             </div>
+             <div>
+-              <h4 className="text-sm font-semibold text-white">Telefona Uygulama Olarak Kur</h4>
+-              <p className="text-xs text-slate-400">Android APK ve iPhone Safari tam ekran desteği</p>
++              <h4 className="text-sm font-semibold text-white">APK & Mobil Kurulum</h4>
++              <p className="text-xs text-slate-400">Android APK indirme ve iPhone Safari tam ekran desteği</p>
+             </div>
+           </div>
+           <button
+-            onClick={handleClick}
++            onClick={() => setShowApkExport(true)}
+             className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs rounded-xl shadow transition active:scale-95"
+           >
+-            Yükle
++            APK İndir
+           </button>
+         </div>
+       ) : (
+         <button
+-          onClick={handleClick}
++          onClick={() => setShowApkExport(true)}
+           id="btn-pwa-install-main"
+           className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/20 active:scale-95 transition cursor-pointer"
+         >
+           <Download className="w-4 h-4" />
+-          <span>Telefona Yükle (APK / Safari)</span>
++          <span>APK İhracat / İndir</span>
+         </button>
+       )}
+ 
+-      {/* Guide Modal for iOS Safari & Android instructions */}
+-      {showGuide && (
+-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in">
+-          <div className="w-full max-w-md rounded-3xl bg-slate-900 border border-slate-700 p-6 shadow-2xl text-slate-100 relative">
+-            <button
+-              onClick={() => setShowGuide(false)}
+-              className="absolute top-4 right-4 p-2 rounded-full text-slate-400 hover:text-white hover:bg-slate-800 transition"
+-            >
+-              <X className="w-5 h-5" />
+-            </button>
+-
+-            <div className="flex items-center gap-3 mb-4">
+-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 to-cyan-500 p-0.5 flex items-center justify-center">
+-                <img src="/icon.svg" alt="Willy" className="w-full h-full rounded-[14px]" />
+-              </div>
+-              <div>
+-                <h3 className="text-lg font-bold text-white">Willy Kilo Takip Kurulumu</h3>
+-                <p className="text-xs text-emerald-400">Android APK & Apple Safari Uyumlu PWA</p>
+-              </div>
+-            </div>
+-
+-            <div className="space-y-4 my-4">
+-              {/* iOS Safari instructions */}
+-              <div className="p-3.5 rounded-2xl bg-slate-800/80 border border-slate-700">
+-                <div className="flex items-center gap-2 text-sm font-semibold text-white mb-2">
+-                  <Apple className="w-4 h-4 text-emerald-400" />
+-                  <span>iPhone / iPad (Apple Safari):</span>
+-                </div>
+-                <ol className="text-xs text-slate-300 space-y-2 list-decimal list-inside pl-1">
+-                  <li className="leading-relaxed">
+-                    Safari alt çubuğundaki <span className="inline-flex items-center gap-1 font-semibold text-white"><Share2 className="w-3.5 h-3.5 text-blue-400" /> Paylaş</span> butonuna dokunun.
+-                  </li>
+-                  <li className="leading-relaxed">
+-                    Açılan menüde aşağı kaydırıp <span className="inline-flex items-center gap-1 font-semibold text-emerald-400"><PlusSquare className="w-3.5 h-3.5" /> Ana Ekrana Ekle</span> seçeneğine basın.
+-                  </li>
+-                  <li className="leading-relaxed">
+-                    Sağ üstteki <strong className="text-white">"Ekle"</strong> düğmesine dokunun. Willy tam bir iOS uygulaması olarak açılacaktır!
+-                  </li>
+-                </ol>
+-              </div>
+-
+-              {/* Android instructions */}
+-              <div className="p-3.5 rounded-2xl bg-slate-800/80 border border-slate-700">
+-                <div className="flex items-center gap-2 text-sm font-semibold text-white mb-2">
+-                  <Smartphone className="w-4 h-4 text-cyan-400" />
+-                  <span>Android (Chrome / Samsung Internet):</span>
+-                </div>
+-                <ol className="text-xs text-slate-300 space-y-2 list-decimal list-inside pl-1">
+-                  <li className="leading-relaxed">
+-                    Chrome sağ üstündeki <strong className="text-white">üç noktaya (⋮)</strong> dokunun.
+-                  </li>
+-                  <li className="leading-relaxed">
+-                    <strong className="text-cyan-400">"Uygulamayı Yükle"</strong> veya <strong className="text-cyan-400">"Ana Ekrana Ekle"</strong> seçeneğini seçin.
+-                  </li>
+-                  <li className="leading-relaxed">
+-                    Willy doğrudan ana ekranınızda bağımsız APK / WebApp olarak çalışmaya başlar.
+-                  </li>
+-                </ol>
+-              </div>
+-            </div>
+-
+-            <button
+-              onClick={() => setShowGuide(false)}
+-              className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm shadow-lg shadow-emerald-500/20 active:scale-95 transition"
+-            >
+-              Anladım, Harika!
+-            </button>
+-          </div>
+-        </div>
+-      )}
++      {/* APK Export & Download Modal */}
++      <ApkExportModal isOpen={showApkExport} onClose={() => setShowApkExport(false)} />
+     </>
+   );
+ };
+diff --git a/src/main.tsx b/src/main.tsx
+index 080dac3..c9f1840 100644
+--- a/src/main.tsx
++++ b/src/main.tsx
+@@ -3,8 +3,16 @@ import {createRoot} from 'react-dom/client';
+ import App from './App.tsx';
+ import './index.css';
+ 
++// Register Service Worker for PWA / WebAPK support
++if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
++  window.addEventListener('load', () => {
++    navigator.serviceWorker.register('/sw.js').catch(() => {});
++  });
++}
++
+ createRoot(document.getElementById('root')!).render(
+   <StrictMode>
+     <App />
+   </StrictMode>,
+ );
++
+-- 
+2.34.1
+

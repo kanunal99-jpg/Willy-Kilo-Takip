@@ -28,6 +28,7 @@ import { WeightTab } from './components/WeightTab';
 import { WillyCoachTab } from './components/WillyCoachTab';
 import { CloudSyncModal } from './components/CloudSyncModal';
 import { ProfileModal } from './components/ProfileModal';
+import { ApkExportModal } from './components/ApkExportModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { PWAInstallButton } from './components/PWAInstallButton';
 
@@ -52,6 +53,7 @@ export function App() {
   const [targetMeal, setTargetMeal] = useState<MealType>('breakfast');
   const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isApkModalOpen, setIsApkModalOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTimestamp, setLastSyncTimestamp] = useState<number>(Date.now());
 
@@ -342,6 +344,7 @@ export function App() {
         onToday={handleToday}
         onOpenSyncModal={() => setIsSyncModalOpen(true)}
         onOpenProfileModal={() => setIsProfileModalOpen(true)}
+        onOpenApkModal={() => setIsApkModalOpen(true)}
         isSyncing={isSyncing}
       />
 
@@ -458,6 +461,12 @@ export function App() {
         onClose={() => setIsProfileModalOpen(false)}
         profile={profile}
         onSaveProfile={(updated) => setProfile(updated)}
+      />
+
+      {/* APK Export & Download Modal */}
+      <ApkExportModal
+        isOpen={isApkModalOpen}
+        onClose={() => setIsApkModalOpen(false)}
       />
 
       {/* PWA Offline indicator */}
