@@ -76,9 +76,7 @@ jobs:
           import os
           import re
           from pathlib import Path
-
           raw = os.environ['KEYSTORE_B64']
-          # Normalize clipboard/secret formatting without exposing the secret.
           clean = re.sub(r'[^A-Za-z0-9+/]', '', raw)
           clean += '=' * ((-len(clean)) % 4)
           try:
@@ -89,33 +87,21 @@ jobs:
               raise SystemExit('ERROR: decoded keystore is empty')
           Path('willy-release.jks').write_bytes(data)
           PY
-
           openssl pkcs12 -in willy-release.jks -passin env:KEYSTORE_PASSWORD -noout >/dev/null 2>&1 || {
             echo "ERROR: decoded keystore is not a valid PKCS12 keystore or the password is incorrect."; exit 1;
           }
-
           python3 - <<'PY'
           from pathlib import Path
           import re
-
           p = Path('app/build.gradle')
           s = p.read_text()
-
           signing = '''\n    signingConfigs {\n        release {\n            storeFile file("../willy-release.jks")\n            storeType "PKCS12"\n            storePassword System.getenv("KEYSTORE_PASSWORD")\n            keyAlias System.getenv("KEY_ALIAS")\n            keyPassword System.getenv("KEY_PASSWORD")\n        }\n    }\n'''
-
           if 'signingConfigs {' not in s:
               s = s.replace('android {', 'android {' + signing, 1)
-
           if 'signingConfig signingConfigs.release' not in s:
-              s, count = re.subn(
-                  r'(buildTypes\s*\{\s*release\s*\{)',
-                  r'\1\n            signingConfig signingConfigs.release',
-                  s,
-                  count=1,
-              )
+              s, count = re.subn(r'(buildTypes\s*\{\s*release\s*\{)', r'\1\n            signingConfig signingConfigs.release', s, count=1)
               if count != 1:
                   raise SystemExit('Could not locate android buildTypes.release block')
-
           p.write_text(s)
           PY
 
@@ -156,14 +142,12 @@ jobs:
           name: Willy Kilo Takip v${{ steps.version.outputs.VERSION }}
           body: |
             ## 🐾 Willy Kilo Takip v${{ steps.version.outputs.VERSION }}
-
             ### ✨ Yenilikler ve Güncellemeler:
             - 🤖 Gerçek Gemini AI Willy Koç & Yemek Analizi
             - 🔄 Canlı OTA Güncelleme Sistemi
             - 📱 PWA & Offline-First
             - 🔐 Kalıcı release imzası ile güvenli Android güncelleme zinciri
             - ⚡ TypeScript doğrulaması ve performans iyileştirmeleri
-
             **İndirme:** `WillyKiloTakip.apk`
           files: |
             release-assets/WillyKiloTakip.apk
@@ -172,3 +156,20 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Wait for Render production deploy
+        if: github.ref == 'refs/heads/main'
+        run: sleep 120
+
+      - name: Production Gemini AI smoke test
+        if: github.ref == 'refs/heads/main'
+        run: |
+          set -euo pipefail
+          payload='{"message":"Kısa bir selam ver ve bugün su tüketimi için tek bir uygulanabilir öneri yaz.","userProfile":{"name":"SmokeTest","goal":"lose_weight","currentWeightKg":80,"targetWeightKg":75,"dailyCalorieTarget":2000,"waterTargetMl":2000},"todaySummary":{"consumedCalories":500,"burnedCalories":0,"waterMl":500,"fastingActive":false}}'
+          response=$(curl --fail-with-body --silent --show-error --max-time 90 \
+            -X POST 'https://willy-kilo-takip.onrender.com/api/ai/coach' \
+            -H 'Content-Type: application/json' \
+            -H 'Accept: application/json' \
+            --data "$payload")
+          echo "$response"
+          node -e 'const r=JSON.parse(process.argv[1]); if (!r.success || !r.reply || !r.model) { console.error("AI smoke test failed", r); process.exit(1) } console.log(`AI smoke test PASS model=${r.model}`)' "$response"
