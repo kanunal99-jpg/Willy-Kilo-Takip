@@ -1,7 +1,7 @@
-import React, { useState, useRef } from 'react';
-import { Camera, Search, Barcode, Plus, Sparkles, X, Check, AlertCircle, ArrowRight, Loader2, UploadCloud } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Camera, Search, Barcode, Plus, Sparkles, X, Check, AlertCircle, ArrowRight, Loader2, UploadCloud, Database, ShieldCheck } from 'lucide-react';
 import { FoodItem, MealFoodEntry, MealType } from '../types';
-import { COMMON_FOOD_DATABASE } from '../data/mockData';
+import { loadFoods, saveFoods } from '../utils/storage';
 
 interface AddFoodModalProps {
   isOpen: boolean;
@@ -16,10 +16,19 @@ export const AddFoodModal: React.FC<AddFoodModalProps> = ({
   targetMeal,
   onAddFood,
 }) => {
-  const [activeTab, setActiveTab] = useState<'search' | 'ai' | 'barcode' | 'custom'>('ai');
+  const [activeTab, setActiveTab] = useState<'search' | 'ai' | 'barcode' | 'custom'>('search');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('Tümü');
   const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
   const [servingAmount, setServingAmount] = useState<number>(1);
+  const [foodDatabase, setFoodDatabase] = useState<FoodItem[]>(() => loadFoods());
+
+  // Refresh foods whenever modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setFoodDatabase(loadFoods());
+    }
+  }, [isOpen]);
 
   // AI Photo Scanning state
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -49,11 +58,36 @@ export const AddFoodModal: React.FC<AddFoodModalProps> = ({
     snack: 'Atıştırmalıklara Ekle',
   };
 
-  // Filter food database
-  const filteredFoods = COMMON_FOOD_DATABASE.filter(f =>
-    f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    f.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const foodCategories = [
+    'Tümü',
+    'Kahvaltı',
+    'Öğle & Akşam',
+    'Meyve & Sebze',
+    'Bakliyat & Tahıl',
+    'Kuruyemiş & Tohum',
+    'Deniz Ürünleri',
+    'İçecek & Çorba',
+    'Süper Gıdalar',
+    'Atıştırmalık',
+  ];
+
+  // Filter food database (385+ items)
+  const filteredFoods = foodDatabase.filter(f => {
+    const q = searchQuery.toLowerCase().trim();
+    const matchesSearch =
+      !q ||
+      f.name.toLowerCase().includes(q) ||
+      f.category.toLowerCase().includes(q) ||
+      (f.barcode && f.barcode.includes(q)) ||
+      (f.pros && f.pros.some(p => p.toLowerCase().includes(q)));
+
+    const matchesCategory =
+      selectedCategory === 'Tümü' ||
+      f.category === selectedCategory ||
+      (selectedCategory === 'Süt & Şarküteri' && (f.category.includes('Süt') || f.category.includes('Yoğurt')));
+
+    return matchesSearch && matchesCategory;
+  });
 
   // Handle Photo selection
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {

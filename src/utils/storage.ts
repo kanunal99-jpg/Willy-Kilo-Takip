@@ -1,5 +1,6 @@
-import { DailyData, FastingSession, Recipe, UserProfile, WeightRecord } from '../types';
+import { DailyData, FastingSession, FoodItem, Recipe, UserProfile, WeightRecord } from '../types';
 import { INITIAL_USER_PROFILE, RECIPES_DATABASE } from '../data/mockData';
+import { runDataMigration } from './dataMigration';
 
 const STORAGE_KEYS = {
   PROFILE: 'willy_user_profile',
@@ -7,6 +8,7 @@ const STORAGE_KEYS = {
   FASTING_SESSIONS: 'willy_fasting_sessions',
   WEIGHT_RECORDS: 'willy_weight_records',
   CUSTOM_RECIPES: 'willy_custom_recipes',
+  FOOD_DATABASE: 'willy_food_database',
   ACTIVE_FAST: 'willy_active_fast',
   LAST_SYNC: 'willy_last_sync_timestamp',
 };
@@ -205,17 +207,62 @@ export const saveFastingHistory = (history: FastingSession[]): void => {
   }
 };
 
+export const loadFoods = (): FoodItem[] => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.FOOD_DATABASE);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.error('Failed to load foods:', e);
+  }
+  // Auto-run migration to seed 500+ items
+  runDataMigration();
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.FOOD_DATABASE);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return [];
+};
+
+export const saveFoods = (foods: FoodItem[]): void => {
+  try {
+    localStorage.setItem(STORAGE_KEYS.FOOD_DATABASE, JSON.stringify(foods));
+  } catch (e) {
+    console.error('Failed to save foods:', e);
+  }
+};
+
 export const loadRecipes = (): Recipe[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.CUSTOM_RECIPES);
     if (raw) {
-      const custom = JSON.parse(raw);
-      return [...RECIPES_DATABASE, ...custom];
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
     }
   } catch (e) {
     console.error('Failed to load recipes:', e);
   }
+  // Auto-run migration to seed 140+ recipes
+  runDataMigration();
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.CUSTOM_RECIPES);
+    if (raw) return JSON.parse(raw);
+  } catch {}
   return RECIPES_DATABASE;
+};
+
+export const saveRecipes = (recipes: Recipe[]): void => {
+  try {
+    localStorage.setItem(STORAGE_KEYS.CUSTOM_RECIPES, JSON.stringify(recipes));
+  } catch (e) {
+    console.error('Failed to save recipes:', e);
+  }
 };
 
 // ---------------- CLOUD SYNCHRONIZATION ----------------
