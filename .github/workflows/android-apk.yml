@@ -67,17 +67,33 @@ jobs:
         working-directory: android
         env:
           KEYSTORE_B64: ${{ secrets.WILLY_RELEASE_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.WILLY_RELEASE_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.WILLY_RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.WILLY_RELEASE_KEY_PASSWORD }}
         run: |
-          CLEAN_B64=$(printf '%s' "$KEYSTORE_B64" | tr -cd 'A-Za-z0-9+/=')
-          REM=$(( ${#CLEAN_B64} % 4 ))
-          if [ "$REM" -ne 0 ]; then
-            CLEAN_B64="${CLEAN_B64}$(printf '=%.0s' $(seq 1 $((4 - REM))))"
-          fi
-          printf '%s' "$CLEAN_B64" | base64 --decode > willy-release.jks
-          test -s willy-release.jks || { echo "ERROR: decoded keystore is empty"; exit 1; }
+          python3 - <<'PY'
+          import base64
+          import os
+          import re
+          from pathlib import Path
+
+          raw = os.environ['KEYSTORE_B64']
+          # Normalize clipboard/secret formatting without exposing the secret.
+          clean = re.sub(r'[^A-Za-z0-9+/]', '', raw)
+          clean += '=' * ((-len(clean)) % 4)
+          try:
+              data = base64.b64decode(clean, validate=True)
+          except Exception as exc:
+              raise SystemExit(f'ERROR: WILLY_RELEASE_KEYSTORE_BASE64 is not valid Base64: {exc}')
+          if not data:
+              raise SystemExit('ERROR: decoded keystore is empty')
+          Path('willy-release.jks').write_bytes(data)
+          PY
+
           openssl pkcs12 -in willy-release.jks -passin env:KEYSTORE_PASSWORD -noout >/dev/null 2>&1 || {
             echo "ERROR: decoded keystore is not a valid PKCS12 keystore or the password is incorrect."; exit 1;
           }
+
           python3 - <<'PY'
           from pathlib import Path
           import re
