@@ -1,16 +1,15 @@
 {
-  "versionName": "1.0.6",
-  "versionCode": 7,
+  "versionName": "1.0.7",
+  "versionCode": 8,
   "releaseDate": "2026-09-05",
   "minSupportedVersion": "1.0.3",
   "apkUrl": "https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest/download/WillyKiloTakip.apk",
   "githubReleaseUrl": "https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest",
   "releaseNotes": [
-    "Android native AI requests use Capacitor's bundled native HTTP transport",
-    "Production Render API bağlantısı ve gerçek Gemini AI Koçu güçlendirildi",
-    "Bulut senkronizasyon anahtarları yeni cihazlarda yüksek entropili hale getirildi",
-    "Bulut senkronizasyonu için istek hız sınırlaması ve veri doğrulaması eklendi",
-    "Senkronizasyon JSON yazımları atomik hale getirildi",
+    "Kamera ile gerçek zamanlı barkod tarama aktif edildi",
+    "Android ML Kit barkod tarayıcı ve kamera izin akışı eklendi",
+    "Barkod okutulduğunda ürün sonucu otomatik olarak sorgulanıyor",
+    "Gerçek Gemini AI yemek analizi ve production API bağlantısı korunuyor",
     "Kalıcı release imzası ile OTA güncelleme zinciri korunuyor"
   ]
 }
