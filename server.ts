@@ -8,7 +8,6 @@ const app = express();
 const PORT = process.env.RENDER ? (Number(process.env.PORT) || 10000) : (process.env.NODE_ENV === 'production' && process.env.PORT && process.env.PORT !== '8080' ? Number(process.env.PORT) : 3000);
 
 // Capacitor Android runs from a native localhost origin and calls the Render API cross-origin.
-// Explicit CORS headers are required so fetch() can read the production JSON response.
 app.use((req, res, next) => {
   const origin = req.headers.origin || '';
   if (origin === 'capacitor://' || origin === 'http://localhost' || origin === 'https://localhost' || origin.startsWith('capacitor://') || origin.startsWith('http://localhost') || origin.startsWith('https://localhost')) {
@@ -50,10 +49,61 @@ function loadCloudDb(): CloudDb {
 
 function saveCloudDb(data: CloudDb) {
   try {
-    fs.writeFileSync(SYNC_FILE, JSON.stringify(data, null, 2), 'utf-8');
+    // Atomic replace prevents a concurrent write or process interruption from corrupting the JSON database.
+    const tempFile = `${SYNC_FILE}.tmp`;
+    fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), 'utf-8');
+    fs.renameSync(tempFile, SYNC_FILE);
   } catch (err) {
     console.error('Error saving cloud db:', err);
+    throw err;
   }
+}
+
+// Sync keys are the only credential in this lightweight sync architecture. Existing 6-digit keys remain
+// compatible, while new profiles use 128-bit random keys. Rate limiting prevents practical brute-force abuse.
+type RateEntry = { windowStart: number; count: number };
+const syncRateByIp = new Map<string, RateEntry>();
+const syncInvalidByIp = new Map<string, RateEntry>();
+const SYNC_WINDOW_MS = 60_000;
+const SYNC_MAX_REQUESTS_PER_IP = 60;
+const SYNC_MAX_INVALID_PER_IP = 10;
+
+function getClientIp(req: express.Request): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.trim()) return forwarded.split(',')[0].trim();
+  return req.ip || req.socket.remoteAddress || 'unknown';
+}
+
+function allowRate(map: Map<string, RateEntry>, ip: string, max: number): boolean {
+  const now = Date.now();
+  const existing = map.get(ip);
+  if (!existing || now - existing.windowStart >= SYNC_WINDOW_MS) {
+    map.set(ip, { windowStart: now, count: 1 });
+    return true;
+  }
+  if (existing.count >= max) return false;
+  existing.count += 1;
+  return true;
+}
+
+function syncKeyLooksValid(key: string): boolean {
+  // Supports legacy WILLY-123456 keys and new WILLY- + 32 hex-character keys.
+  return /^WILLY-(?:\d{6}|[A-F0-9]{32})$/i.test(key);
+}
+
+function requireSyncKey(req: express.Request, res: express.Response): string | null {
+  const key = String(req.params.userId || '').trim().toUpperCase();
+  const ip = getClientIp(req);
+  if (!allowRate(syncRateByIp, ip, SYNC_MAX_REQUESTS_PER_IP)) {
+    res.status(429).json({ success: false, error: 'Çok fazla senkronizasyon isteği. Lütfen kısa süre sonra tekrar deneyin.', code: 'SYNC_RATE_LIMITED' });
+    return null;
+  }
+  if (!syncKeyLooksValid(key)) {
+    allowRate(syncInvalidByIp, ip, SYNC_MAX_INVALID_PER_IP);
+    res.status(400).json({ success: false, error: 'Geçersiz bulut senkronizasyon anahtarı.', code: 'INVALID_SYNC_KEY' });
+    return null;
+  }
+  return key;
 }
 
 let aiClient: GoogleGenAI | null = null;
@@ -123,27 +173,33 @@ app.get(['/api/app-version', '/api/app-version/manifest.json'], async (req, res)
 });
 
 app.get('/api/sync/:userId', (req, res) => {
+  const userId = requireSyncKey(req, res);
+  if (!userId) return;
   const db = loadCloudDb();
-  const data = db[req.params.userId];
+  const data = db[userId];
   if (data) return res.json({ success: true, found: true, data });
   return res.json({ success: true, found: false, message: 'User sync not found yet on cloud.' });
 });
 
 app.post('/api/sync/:userId', (req, res) => {
+  const userId = requireSyncKey(req, res);
+  if (!userId) return;
   try {
-    const { userId } = req.params;
-    const { profile, dailyLogs, fastingHistory, weightRecords, customRecipes } = req.body;
+    const { profile, dailyLogs, fastingHistory, weightRecords, customRecipes } = req.body || {};
+    if (!profile || typeof profile !== 'object' || !Array.isArray(fastingHistory) || !Array.isArray(weightRecords) || typeof dailyLogs !== 'object') {
+      return res.status(400).json({ success: false, error: 'Geçersiz senkronizasyon verisi.', code: 'INVALID_SYNC_PAYLOAD' });
+    }
     const db = loadCloudDb();
     db[userId] = {
-      lastUpdated: Date.now(), profile: profile || db[userId]?.profile,
-      dailyLogs: dailyLogs || db[userId]?.dailyLogs || {}, fastingHistory: fastingHistory || db[userId]?.fastingHistory || [],
-      weightRecords: weightRecords || db[userId]?.weightRecords || [], customRecipes: customRecipes || db[userId]?.customRecipes || [],
+      lastUpdated: Date.now(), profile,
+      dailyLogs, fastingHistory, weightRecords,
+      customRecipes: Array.isArray(customRecipes) ? customRecipes : db[userId]?.customRecipes || [],
     };
     saveCloudDb(db);
     res.json({ success: true, timestamp: db[userId].lastUpdated, message: 'Bulut senkronizasyonu başarıyla tamamlandı.' });
   } catch (error: any) {
     console.error('Sync error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    res.status(500).json({ success: false, error: 'Senkronizasyon verisi kaydedilemedi.', code: 'SYNC_SAVE_FAILED' });
   }
 });
 
@@ -169,7 +225,6 @@ app.post('/api/ai/analyze-food', async (req, res) => {
   }
 });
 
-// AI Nutrition & Weight Coach — gerçek Gemini yanıtı; sessiz/sabit fallback YOK.
 app.post('/api/ai/coach', async (req, res) => {
   const startedAt = Date.now();
   try {
@@ -197,7 +252,6 @@ KURALLAR:
 
 Kullanıcı sorusu: ${userMessage}`;
 
-    // Stable production model first, then current GA fallbacks for transient/model-specific failures.
     const models = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash'];
     let lastError: any = null;
     for (const model of models) {
