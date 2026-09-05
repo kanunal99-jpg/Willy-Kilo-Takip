@@ -45,6 +45,15 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
+      - name: Apply ML Kit barcode Android manifest
+        run: node scripts/ensure-android-barcode-manifest.mjs
+
+      - name: Verify ML Kit barcode Android manifest
+        run: |
+          grep -F 'android.permission.CAMERA' android/app/src/main/AndroidManifest.xml
+          grep -F 'com.google.mlkit.vision.DEPENDENCIES' android/app/src/main/AndroidManifest.xml
+          grep -F 'barcode_ui' android/app/src/main/AndroidManifest.xml
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
@@ -147,6 +156,7 @@ jobs:
             - 🔄 Canlı OTA Güncelleme Sistemi
             - 📱 PWA & Offline-First
             - 🔐 Kalıcı release imzası ile güvenli Android güncelleme zinciri
+            - 📷 ML Kit gerçek kamera barkod tarama zinciri
             - ⚡ TypeScript doğrulaması ve performans iyileştirmeleri
             **İndirme:** `WillyKiloTakip.apk`
           files: |
