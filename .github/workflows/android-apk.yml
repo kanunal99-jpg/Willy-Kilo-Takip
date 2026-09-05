@@ -51,39 +51,48 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      # Production updates require a persistent signing identity. The keystore is
-      # supplied through GitHub Actions secrets and is never committed to the repo.
-      - name: Validate release signing configuration
+      # Never commit the signing key. A persistent signing identity is required
+      # so future APKs can update an installed APK instead of requiring uninstall.
+      - name: Validate release signing secrets
         env:
           KEYSTORE_B64: ${{ secrets.WILLY_RELEASE_KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.WILLY_RELEASE_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.WILLY_RELEASE_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.WILLY_RELEASE_KEY_PASSWORD }}
         run: |
-          test -n "$KEYSTORE_B64" || { echo "Missing WILLY_RELEASE_KEYSTORE_BASE64"; exit 1; }
-          test -n "$KEYSTORE_PASSWORD" || { echo "Missing WILLY_RELEASE_KEYSTORE_PASSWORD"; exit 1; }
-          test -n "$KEY_ALIAS" || { echo "Missing WILLY_RELEASE_KEY_ALIAS"; exit 1; }
-          test -n "$KEY_PASSWORD" || { echo "Missing WILLY_RELEASE_KEY_PASSWORD"; exit 1; }
+          test -n "$KEYSTORE_B64" || { echo "ERROR: WILLY_RELEASE_KEYSTORE_BASE64 is not configured."; exit 1; }
+          test -n "$KEYSTORE_PASSWORD" || { echo "ERROR: WILLY_RELEASE_KEYSTORE_PASSWORD is not configured."; exit 1; }
+          test -n "$KEY_ALIAS" || { echo "ERROR: WILLY_RELEASE_KEY_ALIAS is not configured."; exit 1; }
+          test -n "$KEY_PASSWORD" || { echo "ERROR: WILLY_RELEASE_KEY_PASSWORD is not configured."; exit 1; }
 
-      - name: Configure release signing
+      - name: Configure persistent release signing
         working-directory: android
         env:
           KEYSTORE_B64: ${{ secrets.WILLY_RELEASE_KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.WILLY_RELEASE_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.WILLY_RELEASE_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.WILLY_RELEASE_KEY_PASSWORD }}
         run: |
           echo "$KEYSTORE_B64" | base64 --decode > willy-release.jks
           python3 - <<'PY'
           from pathlib import Path
+          import re
+
           p = Path('app/build.gradle')
           s = p.read_text()
+
           signing = '''\n    signingConfigs {\n        release {\n            storeFile file("../willy-release.jks")\n            storePassword System.getenv("KEYSTORE_PASSWORD")\n            keyAlias System.getenv("KEY_ALIAS")\n            keyPassword System.getenv("KEY_PASSWORD")\n        }\n    }\n'''
+
           if 'signingConfigs {' not in s:
               s = s.replace('android {', 'android {' + signing, 1)
+
           if 'signingConfig signingConfigs.release' not in s:
-              s = s.replace('buildTypes {', 'buildTypes {', 1)
-              s = s.replace('release {', 'release {\n            signingConfig signingConfigs.release', 1)
+              s, count = re.subn(
+                  r'(buildTypes\s*\{\s*release\s*\{)',
+                  r'\1\n            signingConfig signingConfigs.release',
+                  s,
+                  count=1,
+              )
+              if count != 1:
+                  raise SystemExit('Could not locate android buildTypes.release block')
+
           p.write_text(s)
           PY
 
