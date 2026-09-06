@@ -1,6 +1,6 @@
 name: Android APK & GitHub Release
 
-# Release trigger verification: 2026-09-06 beverage catalog fix
+# Canonical release pipeline: version.json -> validation -> APK -> unique release -> production smoke test
 on:
   push:
     branches: [main]
@@ -23,6 +23,44 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Validate release version contract
+        id: version-contract
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/validate-release-version.mjs
+          VERSION=$(node -p "require('./version.json').versionName")
+          CODE=$(node -p "require('./version.json').versionCode")
+          TAG="v$VERSION"
+
+          if git ls-remote --exit-code origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "ERROR: release tag $TAG already exists. Refusing to overwrite an existing version."
+            exit 1
+          fi
+
+          LATEST_TAG=$(gh api "repos/${GITHUB_REPOSITORY}/releases/latest" --jq '.tag_name' 2>/dev/null || true)
+          if [ -n "$LATEST_TAG" ]; then
+            LATEST_B64=$(gh api "repos/${GITHUB_REPOSITORY}/contents/version.json?ref=${LATEST_TAG}" --jq '.content' 2>/dev/null || true)
+            if [ -n "$LATEST_B64" ]; then
+              echo "$LATEST_B64" | tr -d '\n' | base64 -d > /tmp/latest-version.json
+              LATEST_VERSION=$(node -p "require('/tmp/latest-version.json').versionName")
+              LATEST_CODE=$(node -p "require('/tmp/latest-version.json').versionCode")
+              node - "$VERSION" "$CODE" "$LATEST_VERSION" "$LATEST_CODE" <<'NODE'
+              const [version, code, latestVersion, latestCode] = process.argv.slice(2);
+              const parts = (v) => v.split('.').map(Number);
+              const a = parts(version), b = parts(latestVersion);
+              const newer = a[0] > b[0] || (a[0] === b[0] && (a[1] > b[1] || (a[1] === b[1] && a[2] > b[2])));
+              if (!newer) throw new Error(`Version ${version} must be newer than latest release ${latestVersion}`);
+              if (Number(code) <= Number(latestCode)) throw new Error(`versionCode ${code} must be greater than latest release code ${latestCode}`);
+              NODE
+              echo "Release monotonicity PASS: $TAG code=$CODE > $LATEST_TAG code=$LATEST_CODE"
+            fi
+          fi
+
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "CODE=$CODE" >> "$GITHUB_OUTPUT"
+          echo "Release version contract PASS: $TAG (code: $CODE)"
+
       - name: TypeScript validation
         run: npm run lint
 
@@ -38,13 +76,15 @@ jobs:
       - name: Extract version info
         id: version
         run: |
-          VERSION=$(node -p "require('./version.json').versionName || '1.0.1'")
-          CODE=$(node -p "require('./version.json').versionCode || 2")
+          VERSION="${{ steps.version-contract.outputs.VERSION }}"
+          CODE="${{ steps.version-contract.outputs.CODE }}"
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
           echo "CODE=$CODE" >> "$GITHUB_OUTPUT"
           echo "Building Willy Kilo Takip version $VERSION (code: $CODE)"
           sed -i "s/versionCode [0-9]\+/versionCode $CODE/" android/app/build.gradle
           sed -i "s/versionName \"[^\"]*\"/versionName \"$VERSION\"/" android/app/build.gradle
+          grep -F "versionCode $CODE" android/app/build.gradle
+          grep -F "versionName \"$VERSION\"" android/app/build.gradle
 
       - name: Sync Capacitor
         run: npx cap sync android
@@ -138,7 +178,7 @@ jobs:
           path: release-assets/WillyKiloTakip.apk
           if-no-files-found: error
 
-      - name: Create or Update GitHub Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         if: github.ref == 'refs/heads/main'
         with:
@@ -160,7 +200,7 @@ jobs:
             release-assets/WillyKiloTakip-v${{ steps.version.outputs.VERSION }}.apk
           draft: false
           prerelease: false
-          env: GITHUB_TOKEN
+          fail_on_unmatched_files: true
 
       - name: Wait for Render production deploy
         if: github.ref == 'refs/heads/main'
@@ -168,7 +208,6 @@ jobs:
 
       - name: Production Gemini AI smoke test
         if: github.ref == 'refs/heads/main'
-        continue-on-error: true
         run: |
           set -euo pipefail
           payload='{"message":"Kısa bir selam ver ve bugün su tüketimi için tek bir uygulanabilir öneri yaz.","userProfile":{"name":"SmokeTest","goal":"lose_weight","currentWeightKg":80,"targetWeightKg":75,"dailyCalorieTarget":2000,"waterTargetMl":2000},"todaySummary":{"consumedCalories":500,"burnedCalories":0,"waterMl":500,"fastingActive":false}}'
