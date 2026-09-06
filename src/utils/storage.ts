@@ -94,3 +94,42 @@ export const loadRecipes = (): Recipe[] => {
 export const saveRecipes = (recipes: Recipe[]): void => { try { localStorage.setItem(STORAGE_KEYS.CUSTOM_RECIPES, JSON.stringify(recipes)); } catch (e) { console.error('Failed to save recipes:', e); } };
 
 export interface SyncResult { success: boolean; message: string; timestamp?: number; dataUpdated?: boolean; data?: any; }
+
+export const syncWithCloud = async (
+  profile: UserProfile, dailyLogs: Record<string, DailyData>, fastingHistory: FastingSession[], weightRecords: WeightRecord[], forcePull = false, customRecipes: Recipe[] = []
+): Promise<SyncResult> => {
+  try {
+    const userId = profile.cloudSyncKey || profile.id;
+    if (!userId) return { success: false, message: 'Bulut senkronizasyon anahtarı bulunamadı.' };
+    if (forcePull) {
+      const res = await fetch(`/api/sync/${encodeURIComponent(userId)}`);
+      if (!res.ok) throw new Error(`Cloud GET failed: ${res.status}`);
+      const json = await res.json();
+      if (json.success && json.found && json.data) {
+        const cloud = json.data;
+        if (cloud.profile) saveUserProfile(cloud.profile);
+        if (cloud.dailyLogs) saveDailyLogs(cloud.dailyLogs);
+        if (Array.isArray(cloud.fastingHistory)) saveFastingHistory(cloud.fastingHistory);
+        if (Array.isArray(cloud.weightRecords)) saveWeightRecords(cloud.weightRecords);
+        if (Array.isArray(cloud.customRecipes) && cloud.customRecipes.length > 0) saveRecipes(cloud.customRecipes);
+        localStorage.setItem(STORAGE_KEYS.LAST_SYNC, String(cloud.lastUpdated || Date.now()));
+        window.dispatchEvent(new CustomEvent('willy:cloud-sync-updated'));
+        return { success: true, message: 'Buluttan veriler başarıyla çekildi.', timestamp: cloud.lastUpdated, dataUpdated: true, data: cloud };
+      }
+    }
+    const res = await fetch(`/api/sync/${encodeURIComponent(userId)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile, dailyLogs, fastingHistory, weightRecords, customRecipes }),
+    });
+    if (!res.ok) throw new Error(`Cloud POST failed: ${res.status}`);
+    const data = await res.json();
+    if (data.success) {
+      localStorage.setItem(STORAGE_KEYS.LAST_SYNC, String(data.timestamp || Date.now()));
+      return { success: true, message: 'Tüm verileriniz güvenli buluta senkronize edildi.', timestamp: data.timestamp };
+    }
+    return { success: false, message: data.error || 'Senkronizasyon hatası.' };
+  } catch (err) {
+    console.warn('Cloud sync offline or error:', err);
+    return { success: false, message: 'Sunucuya ulaşılamadı. Verileriniz yerel hafızada güvende.' };
+  }
+};
