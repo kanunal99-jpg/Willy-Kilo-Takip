@@ -90,7 +90,7 @@ jobs:
         run: |
           set -euo pipefail
           base='https://willy-kilo-takip.onrender.com'
-          status=$(curl --silent --show-error --max-time 30 --output /tmp/sync-smoke.json --write-out '%{http_code}' "$base/api/sync/smoke-test-user")
+          status=$(curl --silent --show-error --max-time 30 --output /tmp/sync-smoke.json --write-out '%{http_code}' "$base/api/sync/WILLY-123456")
           echo "sync status=$status"
           test "$status" = 503
           python3 - <<'PY'
