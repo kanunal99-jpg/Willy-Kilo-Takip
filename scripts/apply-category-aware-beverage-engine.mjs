@@ -19,8 +19,17 @@ source=source.replace("const vl=(n:number)=>n>=1000?`${n/1000} L`:`${n} ml`;","c
 source=source.replace('🥤 14.000 Alkolsüz İçecek Varyantı','🥤 10.000 Alkolsüz İçecek Varyantı').replace('<Stat v="14.000" l="Varyant"/>','<Stat v="10.000" l="Varyant"/>');
 fs.writeFileSync(file,source,'utf8');
 
-const engine=fs.readFileSync('src/data/beverageRecipeEngine.ts','utf8');
-if(!engine.includes('validateBeverageCatalog'))throw new Error('BEVERAGE_VALIDATOR_MISSING');
+// Keep the generated category engine internally consistent: the Proteinli variant is meaningful
+// only where the recipe family supports an explicit protein addition. Other categories must not
+// generate an ingredient that their own compatibility gate forbids.
+const enginePath='src/data/beverageRecipeEngine.ts';
+let engine=fs.readFileSync(enginePath,'utf8');
+engine=engine.replace("if(variant==='Proteinli' && c!=='Protein İçecekleri')", "if(variant==='Proteinli' && ['Smoothie','Milkshake'].includes(c))");
+fs.writeFileSync(enginePath,engine,'utf8');
+
+const engineCheck=fs.readFileSync(enginePath,'utf8');
+if(!engineCheck.includes("['Smoothie','Milkshake'].includes(c)"))throw new Error('PROTEIN_VARIANT_COMPATIBILITY_PATCH_FAILED');
+if(!engineCheck.includes('validateBeverageCatalog'))throw new Error('BEVERAGE_VALIDATOR_MISSING');
 const mod=await import(new URL('../src/data/beverageRecipeEngine.ts',import.meta.url).href).catch(()=>null);
 if(!mod) console.log('Beverage engine source validation present; runtime validation runs in dedicated catalog check.');
 console.log('CATEGORY_AWARE_BEVERAGE_ENGINE_APPLIED');
