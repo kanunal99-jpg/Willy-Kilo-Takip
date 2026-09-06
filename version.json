@@ -3,8 +3,12 @@
   "versionCode": 13,
   "releaseDate": "2026-09-06",
   "minSupportedVersion": "1.0.3",
-  "minSupportedVersion": "1.0.3",
   "apkUrl": "https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest/download/WillyKiloTakip.apk",
   "githubReleaseUrl": "https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest",
-  "releaseNotes": ["Willy Tarif ve Alkolsüz İçecekler güncellemesi","14.000 tariflik üretim altyapısı","100 ml-3 L+ miktar desteği","Şekersiz, yüksek protein ve vegan filtreleri"]
+  "releaseNotes": [
+    "Willy Tarif ve Alkolsüz İçecekler güncellemesi",
+    "14.000 tariflik üretim altyapısı",
+    "100 ml-3 L+ miktar desteği",
+    "Şekersiz, yüksek protein ve vegan filtreleri"
+  ]
 }
