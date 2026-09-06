@@ -1,0 +1,30 @@
+name: Coach Quality Smoke
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  coach-quality-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for Render deployment
+        run: |
+          for i in {1..30}; do
+            code=$(curl -s -o /tmp/health.json -w '%{http_code}' https://willy-kilo-takip.onrender.com/api/health || true)
+            echo "health HTTP=$code"
+            cat /tmp/health.json || true
+            if [ "$code" = "200" ]; then exit 0; fi
+            sleep 10
+          done
+          echo 'Render health did not become ready in time'
+          exit 1
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run multi-intent real Gemini coach quality gate
+        env:
+          BASE_URL: https://willy-kilo-takip.onrender.com
+        run: node scripts/coach-quality-smoke.mjs
