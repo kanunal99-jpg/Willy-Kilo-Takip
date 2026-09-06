@@ -41,7 +41,7 @@ function localFoodFallback(description = '', mealType = 'lunch') {
 
 function imageFallbackAdvice(description, mealType) {
   if (!description) return 'Ücretsiz yerel modda fotoğrafın görsel içeriği analiz edilemiyor. Daha doğru hesap için yemeğin adını ve yaklaşık porsiyonunu yazabilirsin.';
-  return \`${mealType === 'breakfast' ? 'Kahvaltı' : mealType === 'dinner' ? 'Akşam' : 'Öğün'} için yerel tahmin yapıldı. Porsiyon gramını yazarsan kalori tahminini daha iyi ölçekleyebilirim.\`;
+  return (mealType === 'breakfast' ? 'Kahvaltı' : mealType === 'dinner' ? 'Akşam' : 'Öğün') + ' için yerel tahmin yapıldı. Porsiyon gramını yazarsan kalori tahminini daha iyi ölçekleyebilirim.';
 }
 
 function localCoachFallback(userProfile, todaySummary, userMessage) {
