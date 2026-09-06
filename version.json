@@ -1,14 +1,14 @@
 {
-  "versionName": "1.0.17",
-  "versionCode": 18,
+  "versionName": "1.0.18",
+  "versionCode": 19,
   "releaseDate": "2026-09-06",
   "minSupportedVersion": "1.0.3",
   "apkUrl": "https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest/download/WillyKiloTakip.apk",
   "githubReleaseUrl": "https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest",
   "releaseNotes": [
-    "On-device ML Kit görsel etiketleme köprüsü eklendi",
-    "Gemini kotası yokken cihaz içi görsel etiketleme + yerel beslenme fallback zinciri eklendi",
-    "Fotoğraf sonucu güven skoru ve doğrulanmamış porsiyon uyarıları korunur",
-    "OTA, uygulama içi sürüm ve Android versionCode hizalandı"
+    "Kategori uyumlu alkolsüz içecek tarif motoru eklendi",
+    "10.000 alkolsüz içecek varyantı kategori bazlı tarif kurallarıyla üretilir",
+    "Alkol güvenlik kontrolü ve tarif kalite zinciri korunur",
+    "İçecek miktarı ml/L ve besin değerleri korunur"
   ]
 }
