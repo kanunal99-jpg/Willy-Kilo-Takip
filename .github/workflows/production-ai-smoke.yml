@@ -30,15 +30,8 @@ jobs:
           ]
           replies = []
           for q in questions:
-              payload = json.dumps({
-                  'message': q,
-                  'userProfile': {'name':'SmokeTest','goal':'lose_weight','currentWeightKg':80,'targetWeightKg':75,'dailyCalorieTarget':2000,'waterTargetMl':2500},
-                  'todaySummary': {'consumedCalories':500,'burnedCalories':0,'waterMl':750,'fastingActive':False}
-              }, ensure_ascii=False)
-              result = subprocess.run([
-                  'curl','--fail-with-body','--silent','--show-error','--max-time','90','-X','POST',
-                  'https://willy-kilo-takip.onrender.com/api/ai/coach','-H','Content-Type: application/json','--data',payload
-              ], capture_output=True, text=True, check=True)
+              payload = json.dumps({'message': q, 'userProfile': {'name':'SmokeTest','goal':'lose_weight','currentWeightKg':80,'targetWeightKg':75,'dailyCalorieTarget':2000,'waterTargetMl':2500}, 'todaySummary': {'consumedCalories':500,'burnedCalories':0,'waterMl':750,'fastingActive':False}}, ensure_ascii=False)
+              result = subprocess.run(['curl','--fail-with-body','--silent','--show-error','--max-time','90','-X','POST','https://willy-kilo-takip.onrender.com/api/ai/coach','-H','Content-Type: application/json','--data',payload], capture_output=True, text=True, check=True)
               data = json.loads(result.stdout)
               assert data.get('success') and data.get('reply'), data
               replies.append(data['reply'])
@@ -51,7 +44,6 @@ jobs:
       - name: Test production photo analysis fallback
         run: |
           set -euo pipefail
-          # 1x1 PNG. This verifies the real image POST path and the honest zero-cost fallback.
           IMAGE_B64='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
           payload=$(printf '{"imageBase64":"%s","mimeType":"image/png","description":"","mealType":"lunch"}' "$IMAGE_B64")
           response=$(curl --fail-with-body --silent --show-error --max-time 90 -X POST 'https://willy-kilo-takip.onrender.com/api/ai/analyze-food' -H 'Content-Type: application/json' --data "$payload")
@@ -69,4 +61,41 @@ jobs:
           else:
               raise SystemExit(f'Unexpected provider: {r.get("provider")}')
           print(f'PHOTO SMOKE PASS provider={r.get("provider")} visualAnalyzed={r.get("visualAnalyzed")}')
+          PY
+
+      - name: Test packaged product barcode lookup
+        run: |
+          set -euo pipefail
+          base='https://willy-kilo-takip.onrender.com'
+          known=$(curl --fail-with-body --silent --show-error --max-time 30 "$base/api/products/barcode/3017624010701")
+          echo "$known"
+          KNOWN="$known" python3 - <<'PY'
+          import json, os
+          d=json.loads(os.environ['KNOWN'])
+          assert d.get('success') is True and d.get('found') is True, d
+          assert d.get('source') == 'local-catalog', d
+          assert d.get('data'), d
+          print('KNOWN BARCODE SMOKE PASS')
+          PY
+          status=$(curl --silent --show-error --max-time 30 --output /tmp/invalid-barcode.json --write-out '%{http_code}' "$base/api/products/barcode/123")
+          test "$status" = 400
+          python3 - <<'PY'
+          import json
+          d=json.load(open('/tmp/invalid-barcode.json'))
+          assert d.get('success') is False and d.get('code') == 'INVALID_BARCODE', d
+          print('INVALID BARCODE SMOKE PASS')
+          PY
+
+      - name: Test sync persistence safety guard
+        run: |
+          set -euo pipefail
+          base='https://willy-kilo-takip.onrender.com'
+          status=$(curl --silent --show-error --max-time 30 --output /tmp/sync-smoke.json --write-out '%{http_code}' "$base/api/sync/smoke-test-user")
+          echo "sync status=$status"
+          test "$status" = 503
+          python3 - <<'PY'
+          import json
+          d=json.load(open('/tmp/sync-smoke.json'))
+          assert d.get('code') == 'SYNC_PERSISTENCE_UNAVAILABLE', d
+          print('SYNC PERSISTENCE GUARD SMOKE PASS')
           PY
