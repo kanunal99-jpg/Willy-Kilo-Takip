@@ -55,7 +55,8 @@ const newAiBlock = `const models = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gem
       } catch (err: any) {
         lastError = err;
         console.error(\`AI Food Analysis model=\${model} failed:\`, err?.message || err);
-        if (isGeminiQuotaExhaustedError(err)) return geminiQuotaResponse(res);
+        // Quota exhaustion is a normal provider failure: stop cloud retries and let the route's local safe fallback respond.
+        if (isGeminiQuotaExhaustedError(err)) break;
       }
     }
     if (!response?.text) throw lastError || new Error('Gemini AI boş yanıt döndürdü');`;
@@ -71,17 +72,17 @@ const coachCatchNeedle = /      } catch \(err: any\) \{\n        lastError = err
 const coachCatchReplacement = `      } catch (err: any) {
         lastError = err;
         console.error(\`AI Coach model=\${model} failed:\`, err?.message || err);
-        if (isGeminiQuotaExhaustedError(err)) return geminiQuotaResponse(res);
+        if (isGeminiQuotaExhaustedError(err)) break;
       }`;
 if (coachCatchNeedle.test(server)) {
   server = server.replace(coachCatchNeedle, coachCatchReplacement);
 }
 
-// Surface quota exhaustion cleanly if the final fallback throws it outside the loop.
+// Quota failures now fall through to the existing local safe fallback instead of exposing a 429 to the app.
 const coachFinalNeedle = "return res.status(502).json({ success: false, error: 'Gemini AI yanıt üretemedi: ' + (lastError?.message || 'Bilinmeyen hata'), code: 'AI_REQUEST_FAILED' });";
 if (server.includes(coachFinalNeedle)) {
-  server = server.replace(coachFinalNeedle, "if (isGeminiQuotaExhaustedError(lastError)) return geminiQuotaResponse(res);\n    " + coachFinalNeedle);
+  server = server.replace(coachFinalNeedle, "" + coachFinalNeedle);
 }
 
 fs.writeFileSync(serverPath, server);
-console.log('Production AI patch PASS: native API base + image MIME + Gemini fallback + quota classification applied.');
+console.log('Production AI patch PASS: native API base + image MIME + Gemini fallback + quota-safe local fallback applied.');
