@@ -23,8 +23,13 @@ export type NutritionResult = { ingredients: NutritionIngredient[]; calories: nu
 
 type CompatibleIngredient = RecipeIngredient | NutritionInput;
 function toCanonical(item: CompatibleIngredient): { key: string; name: string; amount: number; unit: string } {
-  if ('grams' in item && typeof item.grams === 'number') return { key: item.key, name: item.name, amount: item.grams, unit: 'g' };
-  if (typeof item.amount === 'number') return { key: item.key, name: item.name, amount: item.amount, unit: item.unit || 'g' };
+  const fallbackName = INGREDIENTS[item.key]?.name ?? item.key;
+  if ('grams' in item && typeof item.grams === 'number') {
+    return { key: item.key, name: 'name' in item && typeof item.name === 'string' ? item.name : fallbackName, amount: item.grams, unit: 'g' };
+  }
+  if ('amount' in item && typeof item.amount === 'number') {
+    return { key: item.key, name: 'name' in item && typeof item.name === 'string' ? item.name : fallbackName, amount: item.amount, unit: item.unit || 'g' };
+  }
   throw new Error(`Invalid nutrition ingredient amount: ${item.key}`);
 }
 
