@@ -45,14 +45,7 @@ jobs:
               echo "$LATEST_B64" | tr -d '\n' | base64 -d > /tmp/latest-version.json
               LATEST_VERSION=$(node -p "require('/tmp/latest-version.json').versionName")
               LATEST_CODE=$(node -p "require('/tmp/latest-version.json').versionCode")
-              node - "$VERSION" "$CODE" "$LATEST_VERSION" "$LATEST_CODE" <<'NODE'
-              const [version, code, latestVersion, latestCode] = process.argv.slice(2);
-              const parts = (v) => v.split('.').map(Number);
-              const a = parts(version), b = parts(latestVersion);
-              const newer = a[0] > b[0] || (a[0] === b[0] && (a[1] > b[1] || (a[1] === b[1] && a[2] > b[2])));
-              if (!newer) throw new Error(`Version ${version} must be newer than latest release ${latestVersion}`);
-              if (Number(code) <= Number(latestCode)) throw new Error(`versionCode ${code} must be greater than latest release code ${latestCode}`);
-              NODE
+              node -e 'const [version,code,latestVersion,latestCode]=process.argv.slice(1); const parts=v=>v.split(".").map(Number); const a=parts(version),b=parts(latestVersion); const newer=a[0]>b[0]||(a[0]===b[0]&&(a[1]>b[1]||(a[1]===b[1]&&a[2]>b[2]))); if(!newer) throw new Error(`Version ${version} must be newer than latest release ${latestVersion}`); if(Number(code)<=Number(latestCode)) throw new Error(`versionCode ${code} must be greater than latest release code ${latestCode}`);' "$VERSION" "$CODE" "$LATEST_VERSION" "$LATEST_CODE"
               echo "Release monotonicity PASS: $TAG code=$CODE > $LATEST_TAG code=$LATEST_CODE"
             fi
           fi
