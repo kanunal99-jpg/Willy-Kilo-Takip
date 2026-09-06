@@ -9,16 +9,16 @@ export interface AppVersionInfo {
 }
 
 export const APP_VERSION: AppVersionInfo = {
-  versionName: '1.0.17',
-  versionCode: 18,
+  versionName: '1.0.20',
+  versionCode: 21,
   releaseDate: '2026-09-06',
   minSupportedVersion: '1.0.3',
-  apkUrl: 'https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest/download/WillyKiloTakip.apk',
+  apkUrl: 'https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/download/v1.0.20/WillyKiloTakip-v1.0.20.apk',
   githubReleaseUrl: 'https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest',
   releaseNotes: [
-    'On-device ML Kit görsel etiketleme köprüsü eklendi',
-    'Gemini kotası yokken cihaz içi görsel etiketleme + yerel beslenme fallback zinciri eklendi',
-    'Fotoğraf sonucu güven skoru ve doğrulanmamış porsiyon uyarıları korunur',
-    'OTA, uygulama içi sürüm ve Android versionCode hizalandı',
+    'OTA güncelleme indirme akışı cihazın yerel tarayıcı/indirme yöneticisine yönlendirildi',
+    'Uygulama içi sürüm bilgisi Android release sürümüyle yeniden hizalandı',
+    'APK indirme bağlantısı sürüme özel imzalı release varlığına sabitlendi',
+    'Önceki 1.0.17 sürüm metadata uyuşmazlığı giderildi',
   ],
 };
