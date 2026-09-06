@@ -1,47 +1,9 @@
 import { USDA } from './nutritionSources';
-
-export type NutritionIngredient = { key:string; name:string; kcalPer100g:number; proteinPer100g:number; carbsPer100g:number; fatPer100g:number; fiberPer100g:number; source:string; sourceUrl:string; confidence:'reference'|'estimated' };
-
-export const INGREDIENTS: Record<string,NutritionIngredient> = {
-  water:{key:'water',name:'Su',kcalPer100g:0,proteinPer100g:0,carbsPer100g:0,fatPer100g:0,fiberPer100g:0,source:'USDA_FDC_REFERENCE',sourceUrl:USDA,confidence:'reference'},
-  honey:{key:'honey',name:'Bal',kcalPer100g:304,proteinPer100g:.3,carbsPer100g:82.4,fatPer100g:0,fiberPer100g:0,source:'USDA_FDC_REFERENCE',sourceUrl:USDA,confidence:'reference'},
-  yogurt:{key:'yogurt',name:'Yoğurt',kcalPer100g:61,proteinPer100g:3.5,carbsPer100g:4.7,fatPer100g:3.3,fiberPer100g:0,source:'USDA_FDC_REFERENCE',sourceUrl:USDA,confidence:'reference'},
-  milk:{key:'milk',name:'Süt',kcalPer100g:61,proteinPer100g:3.2,carbsPer100g:4.8,fatPer100g:3.3,fiberPer100g:0,source:'USDA_FDC_REFERENCE',sourceUrl:USDA,confidence:'reference'},
-  lemon:{key:'lemon',name:'Limon',kcalPer100g:29,proteinPer100g:1.1,carbsPer100g:9.3,fatPer100g:.3,fiberPer100g:2.8,source:'USDA_FDC_REFERENCE',sourceUrl:USDA,confidence:'reference'},
-  strawberry:{key:'strawberry',name:'Çilek',kcalPer100g:32,proteinPer100g:.7,carbsPer100g:7.7,fatPer100g:.3,fiberPer100g:2,source:'USDA_FDC_REFERENCE',sourceUrl:USDA,confidence:'reference'},
-  apple:{key:'apple',name:'Elma',kcalPer100g:52,proteinPer100g:.3,carbsPer100g:13.8,fatPer100g:.2,fiberPer100g:2.4,source:'USDA_FDC_REFERENCE',sourceUrl:USDA,confidence:'reference'},
-  mango:{key:'mango',name:'Mango',kcalPer100g:60,proteinPer100g:.8,carbsPer100g:15,fatPer100g:.4,fiberPer100g:1.6,source:'USDA_FDC_REFERENCE',sourceUrl:USDA,confidence:'reference'},
-  berries:{key:'berries',name:'Orman Meyveleri',kcalPer100g:57,proteinPer100g:.7,carbsPer100g:13.8,fatPer100g:.3,fiberPer100g:4,source:'USDA_FDC_REFERENCE',sourceUrl:USDA,confidence:'reference'},
-  ginger:{key:'ginger',name:'Zencefil',kcalPer100g:80,proteinPer100g:1.8,carbsPer100g:17.8,fatPer100g:.8,fiberPer100g:2,source:'USDA_FDC_REFERENCE',sourceUrl:USDA,confidence:'reference'},
-  cinnamon:{key:'cinnamon',name:'Tarçın',kcalPer100g:247,proteinPer100g:4,carbsPer100g:80.6,fatPer100g:1.2,fiberPer100g:53.1,source:'USDA_FDC_REFERENCE',sourceUrl:USDA,confidence:'reference'},
-  coffee:{key:'coffee',name:'Kahve',kcalPer100g:2,proteinPer100g:.1,carbsPer100g:.3,fatPer100g:0,fiberPer100g:0,source:'USDA_FDC_REFERENCE',sourceUrl:USDA,confidence:'reference'},
-  tea:{key:'tea',name:'Çay',kcalPer100g:1,proteinPer100g:0,carbsPer100g:.2,fatPer100g:0,fiberPer100g:0,source:'USDA_FDC_REFERENCE',sourceUrl:USDA,confidence:'reference'},
-  herbs:{key:'herbs',name:'Taze Otlar',kcalPer100g:30,proteinPer100g:2,carbsPer100g:5,fatPer100g:.5,fiberPer100g:3,source:'USDA_FDC_REFERENCE',sourceUrl:USDA,confidence:'reference'},
-  sugar:{key:'sugar',name:'Şeker',kcalPer100g:387,proteinPer100g:0,carbsPer100g:100,fatPer100g:0,fiberPer100g:0,source:'USDA_FDC_REFERENCE',sourceUrl:USDA,confidence:'reference'},
-  oats:{key:'oats',name:'Yulaf',kcalPer100g:389,proteinPer100g:16.9,carbsPer100g:66.3,fatPer100g:6.9,fiberPer100g:10.6,source:'USDA_FDC_REFERENCE',sourceUrl:USDA,confidence:'reference'},
-  protein:{key:'protein',name:'Protein Tozu',kcalPer100g:400,proteinPer100g:80,carbsPer100g:8,fatPer100g:6,fiberPer100g:0,source:'USDA_FDC_REFERENCE',sourceUrl:USDA,confidence:'reference'},
-  salt:{key:'salt',name:'İyotlu tuz',kcalPer100g:0,proteinPer100g:0,carbsPer100g:0,fatPer100g:0,fiberPer100g:0,source:'USDA_FDC_REFERENCE',sourceUrl:USDA,confidence:'reference'},
-  rose:{key:'rose',name:'Gül',kcalPer100g:0,proteinPer100g:0,carbsPer100g:0,fatPer100g:0,fiberPer100g:0,source:'USDA_REFERENCE',sourceUrl:USDA,confidence:'estimated'},
+export type NutritionIngredient={key:string;name:string;kcalPer100g:number;proteinPer100g:number;carbsPer100g:number;fatPer100g:number;fiberPer100g:number;source:string;sourceUrl:string;confidence:'reference'|'estimated'};
+const n=(key:string,name:string,kcal:number,p:number,c:number,f:number,fi:number):NutritionIngredient=>({key,name,kcalPer100g:kcal,proteinPer100g:p,carbsPer100g:c,fatPer100g:f,fiberPer100g:fi,source:'USDA_FDC_REFERENCE',sourceUrl:USDA,confidence:'reference'});
+export const INGREDIENTS:Record<string,NutritionIngredient>={
+water:n('water','Su',0,0,0,0,0),honey:n('honey','Bal',304,.3,82.4,0,0),yogurt:n('yogurt','Yoğurt',61,3.5,4.7,3.3,0),milk:n('milk','Süt',61,3.2,4.8,3.3,0),lemon:n('lemon','Limon',29,1.1,9.3,.3,2.8),strawberry:n('strawberry','Çilek',32,.7,7.7,.3,2),apple:n('apple','Elma',52,.3,13.8,.2,2.4),mango:n('mango','Mango',60,.8,15,.4,1.6),berries:n('berries','Orman Meyveleri',57,.7,13.8,.3,4),ginger:n('ginger','Zencefil',80,1.8,17.8,.8,2),cinnamon:n('cinnamon','Tarçın',247,4,80.6,1.2,53.1),coffee:n('coffee','Kahve',2,.1,.3,0,0),tea:n('tea','Çay',1,0,.2,0,0),herbs:n('herbs','Taze Otlar',30,2,5,.5,3),sugar:n('sugar','Şeker',387,0,100,0,0),oats:n('oats','Yulaf',389,16.9,66.3,6.9,10.6),protein:n('protein','Protein Tozu',400,80,8,6,0),salt:n('salt','İyotlu tuz',0,0,0,0,0),rose:n('rose','Gül',0,0,0,0,0),mint:n('mint','Nane',44,3.3,8.4,.7,6.8),vanilla:n('vanilla','Vanilya',288,.1,12.7,.1,0),cocoa:n('cocoa','Kakao',228,19.6,57.9,13.1,33.2),banana:n('banana','Muz',89,1.1,22.8,.3,2.6),orange:n('orange','Portakal',47,.9,11.8,.1,2.4),peach:n('peach','Şeftali',39,.9,9.5,.3,1.5),pomegranate:n('pomegranate','Nar',83,1.7,18.7,1.2,4),grape:n('grape','Üzüm',69,.7,18.1,.2,.9),carrot:n('carrot','Havuç',41,.9,9.6,.2,2.8),cucumber:n('cucumber','Salatalık',15,.7,3.6,.1,.5),lime:n('lime','Misket limonu',30,.7,10.5,.2,2.8),watermelon:n('watermelon','Karpuz',30,.6,7.6,.2,.4),chocolate:n('chocolate','Bitter çikolata',598,7.8,45.9,42.6,10.9),almond:n('almond','Badem',579,21.2,21.6,49.9,12.5),peanut:n('peanut','Yer fıstığı',567,25.8,16.1,49.2,8.5),hazelnut:n('hazelnut','Fındık',628,14.9,16.7,60.8,9.7),date:n('date','Hurma',282,2.5,75,0.4,8),chia:n('chia','Chia',486,16.5,42.1,30.7,34.4),flaxseed:n('flaxseed','Keten tohumu',534,18.3,28.9,42.2,27.3),avocado:n('avocado','Avokado',160,2,8.5,14.7,6.7),beet:n('beet','Pancar',43,1.6,9.6,.2,2.8),spinach:n('spinach','Ispanak',23,2.9,3.6,.4,2.2),celery:n('celery','Kereviz',16,.7,3,.2,1.6),parsley:n('parsley','Maydanoz',36,3,6.3,.8,3.3),lemon_peel:n('lemon_peel','Limon kabuğu',47,1.5,16,.3,10.6),rosewater:n('rosewater','Gül suyu',0,0,0,0,0),sparkling_water:n('sparkling_water','Maden suyu',0,0,0,0,0),ice:n('ice','Buz',0,0,0,0,0),turmeric:n('turmeric','Zerdeçal',312,9.7,67.1,3.2,22.7),cardamom:n('cardamom','Kakule',311,10.8,68.5,6.7,28),clove:n('clove','Karanfil',274,6,65.5,13,33.9),black_pepper:n('black_pepper','Karabiber',251,10.4,63.9,3.3,25.3),coconut:n('coconut','Hindistan cevizi',354,3.3,15.2,33.5,9),coconut_milk:n('coconut_milk','Hindistan cevizi sütü',230,2.3,5.5,23.8,2.2),tahini:n('tahini','Tahin',595,17,21.2,53.8,9.3),molasses:n('molasses','Pekmez',290,0,74,0,0),boza:n('boza','Boza',87,3.5,17,0.5,1),black_tea:n('black_tea','Siyah çay',1,0,.2,0,0),green_tea:n('green_tea','Yeşil çay',1,0,.2,0,0),protein_plant:n('protein_plant','Bitkisel protein',380,75,10,5,2),salt:n('salt','İyotlu tuz',0,0,0,0,0)
 };
-
-export type NutritionInput = { key:string; grams:number };
-export type NutritionResult = { kcal:number; protein:number; carbs:number; fat:number; fiber:number; provenance:NutritionIngredient[] };
-
-export function calculateNutrition(items:NutritionInput[]):NutritionResult {
-  const provenance:NutritionIngredient[]=[];
-  const totals={kcal:0,protein:0,carbs:0,fat:0,fiber:0};
-  for(const item of items){
-    const n=INGREDIENTS[item.key];
-    if(!n) throw new Error(`Nutrition ingredient not found: ${item.key}`);
-    const f=item.grams/100;
-    totals.kcal+=n.kcalPer100g*f;
-    totals.protein+=n.proteinPer100g*f;
-    totals.carbs+=n.carbsPer100g*f;
-    totals.fat+=n.fatPer100g*f;
-    totals.fiber+=n.fiberPer100g*f;
-    if(!provenance.some(p=>p.key===n.key)) provenance.push(n);
-  }
-  return {kcal:Math.round(totals.kcal*10)/10,protein:Math.round(totals.protein*10)/10,carbs:Math.round(totals.carbs*10)/10,fat:Math.round(totals.fat*10)/10,fiber:Math.round(totals.fiber*10)/10,provenance};
-}
-
-export function nutritionAudit(items:NutritionInput[]):NutritionResult { return calculateNutrition(items); }
+export type NutritionInput={key:string;grams:number}; export type NutritionResult={kcal:number;protein:number;carbs:number;fat:number;fiber:number;provenance:NutritionIngredient[]};
+export function calculateNutrition(items:NutritionInput[]):NutritionResult{const provenance:NutritionIngredient[]=[];const totals={kcal:0,protein:0,carbs:0,fat:0,fiber:0};for(const item of items){const x=INGREDIENTS[item.key];if(!x)throw new Error(`Nutrition ingredient not found: ${item.key}`);const f=item.grams/100;totals.kcal+=x.kcalPer100g*f;totals.protein+=x.proteinPer100g*f;totals.carbs+=x.carbsPer100g*f;totals.fat+=x.fatPer100g*f;totals.fiber+=x.fiberPer100g*f;if(!provenance.some(p=>p.key===x.key))provenance.push(x)}return{kcal:Math.round(totals.kcal*10)/10,protein:Math.round(totals.protein*10)/10,carbs:Math.round(totals.carbs*10)/10,fat:Math.round(totals.fat*10)/10,fiber:Math.round(totals.fiber*10)/10,provenance}}
+export function nutritionAudit(items:NutritionInput[]):NutritionResult{return calculateNutrition(items)}
