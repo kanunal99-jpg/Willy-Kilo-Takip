@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "node scripts/prepare-production.mjs && node scripts/repair-free-ai-policy-template.mjs && node scripts/apply-free-ai-policy.mjs && node scripts/patch-free-ai-vision.mjs && node scripts/patch-free-ai-client.mjs && vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "build": "node scripts/prepare-production.mjs && node scripts/repair-free-ai-policy-template.mjs && node scripts/apply-free-ai-policy.mjs && node scripts/patch-free-ai-vision.mjs && node scripts/patch-free-ai-client.mjs && node scripts/patch-local-food-fallback.mjs && vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
@@ -34,6 +34,7 @@
   "devDependencies": {
     "@capacitor/cli": "^7.4.3",
     "@types/node": "^22.14.0",
+    "autoprefixer": "^10.4.0",
     "autoprefixer": "^10.4.21",
     "tailwindcss": "^4.1.14",
     "typescript": "~5.8.2"
