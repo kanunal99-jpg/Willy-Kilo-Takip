@@ -1,5 +1,6 @@
 name: Android APK & GitHub Release
 
+# Release trigger verification: 2026-09-06
 on:
   push:
     branches: [main]
