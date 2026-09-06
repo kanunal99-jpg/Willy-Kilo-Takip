@@ -1,9 +1,9 @@
 {
-  "versionName": "1.0.14",
-  "versionCode": 15,
+  "versionName": "1.0.15",
+  "versionCode": 16,
   "releaseDate": "2026-09-06",
   "minSupportedVersion": "1.0.3",
   "apkUrl": "https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest/download/WillyKiloTakip.apk",
   "githubReleaseUrl": "https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest",
-  "releaseNotes": ["Willy Tarif ve Alkolsüz İçecekler güncellemesi","14.000 tariflik üretim altyapısı","100 ml-3 L+ miktar desteği","Şekersiz, yüksek protein ve vegan filtreleri","Sürüm zinciri kök düzeltmesi: mevcut v1.0.13 etiketi üzerine güvenli monotonic release"]
+  "releaseNotes": ["Intent-aware Willy AI local fallback","4 farklı soru için farklı ve konuya uygun cevap zinciri","Gemini Free Tier başarısız olduğunda ücretsiz güvenli fallback", "Sürüm zinciri monotonic release"]
 }
