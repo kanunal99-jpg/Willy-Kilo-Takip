@@ -1,6 +1,96 @@
-import { USDA } from './nutritionSources';
-export type NutritionIngredient={key:string;name:string;kcalPer100g:number;proteinPer100g:number;carbsPer100g:number;fatPer100g:number;fiberPer100g:number;source:string;sourceUrl:string;confidence:'reference'|'estimated'};
-const ingredient=(key:string,name:string,kcal:number,p:number,c:number,f:number,fi:number):NutritionIngredient=>({key,name,kcalPer100g:kcal,proteinPer100g:p,carbsPer100g:c,fatPer100g:f,fiberPer100g:fi,source:'USDA_FDC_REFERENCE',sourceUrl:USDA,confidence:'reference'});
-export const INGREDIENTS:Record<string,NutritionIngredient>={water:ingredient('water','Su',0,0,0,0,0),honey:ingredient('honey','Bal',304,.3,82.4,0,0),yogurt:ingredient('yogurt','Yoğurt',61,3.5,4.7,3.3,0),milk:ingredient('milk','Süt',61,3.2,4.8,3.3,0),lemon:ingredient('lemon','Limon',29,1.1,9.3,.3,2.8),strawberry:ingredient('strawberry','Çilek',32,.7,7.7,.3,2),apple:ingredient('apple','Elma',52,.3,13.8,.2,2.4),mango:ingredient('mango','Mango',60,.8,15,.4,1.6),berries:ingredient('berries','Orman Meyveleri',57,.7,13.8,.3,4),ginger:ingredient('ginger','Zencefil',80,1.8,17.8,.8,2),cinnamon:ingredient('cinnamon','Tarçın',247,4,80.6,1.2,53.1),coffee:ingredient('coffee','Kahve',2,.1,.3,0,0),tea:ingredient('tea','Çay',1,0,.2,0,0),herbs:ingredient('herbs','Taze Otlar',30,2,5,.5,3),sugar:ingredient('sugar','Şeker',387,0,100,0,0),oats:ingredient('oats','Yulaf',389,16.9,66.3,6.9,10.6),protein:ingredient('protein','Protein Tozu',400,80,8,6,0),salt:ingredient('salt','İyotlu tuz',0,0,0,0,0),rose:ingredient('rose','Gül',0,0,0,0,0),mint:ingredient('mint','Nane',44,3.3,8.4,.7,6.8),vanilla:ingredient('vanilla','Vanilya',288,.1,12.7,.1,0),cocoa:ingredient('cocoa','Kakao',228,19.6,57.9,13.1,33.2),banana:ingredient('banana','Muz',89,1.1,22.8,.3,2.6),orange:ingredient('orange','Portakal',47,.9,11.8,.1,2.4),peach:ingredient('peach','Şeftali',39,.9,9.5,.3,1.5),pomegranate:ingredient('pomegranate','Nar',83,1.7,18.7,1.2,4),grape:ingredient('grape','Üzüm',69,.7,18.1,.2,.9),carrot:ingredient('carrot','Havuç',41,.9,9.6,.2,2.8),cucumber:ingredient('cucumber','Salatalık',15,.7,3.6,.1,.5),lime:ingredient('lime','Misket limonu',30,.7,10.5,.2,2.8),watermelon:ingredient('watermelon','Karpuz',30,.6,7.6,.2,.4),chocolate:ingredient('chocolate','Bitter çikolata',598,7.8,45.9,42.6,10.9),almond:ingredient('almond','Badem',579,21.2,21.6,49.9,12.5),peanut:ingredient('peanut','Yer fıstığı',567,25.8,16.1,49.2,8.5),hazelnut:ingredient('hazelnut','Fındık',628,14.9,16.7,60.8,9.7),date:ingredient('date','Hurma',282,2.5,75,.4,8),chia:ingredient('chia','Chia',486,16.5,42.1,30.7,34.4),flaxseed:ingredient('flaxseed','Keten tohumu',534,18.3,28.9,42.2,27.3),avocado:ingredient('avocado','Avokado',160,2,8.5,14.7,6.7),beet:ingredient('beet','Pancar',43,1.6,9.6,.2,2.8),spinach:ingredient('spinach','Ispanak',23,2.9,3.6,.4,2.2),celery:ingredient('celery','Kereviz',16,.7,3,.2,1.6),parsley:ingredient('parsley','Maydanoz',36,3,6.3,.8,3.3),lemon_peel:ingredient('lemon_peel','Limon kabuğu',47,1.5,16,.3,10.6),rosewater:ingredient('rosewater','Gül suyu',0,0,0,0,0),sparkling_water:ingredient('sparkling_water','Maden suyu',0,0,0,0,0),ice:ingredient('ice','Buz',0,0,0,0,0),turmeric:ingredient('turmeric','Zerdeçal',312,9.7,67.1,3.2,22.7),cardamom:ingredient('cardamom','Kakule',311,10.8,68.5,6.7,28),clove:ingredient('clove','Karanfil',274,6,65.5,13,33.9),black_pepper:ingredient('black_pepper','Karabiber',251,10.4,63.9,3.3,25.3),coconut:ingredient('coconut','Hindistan cevizi',354,3.3,15.2,33.5,9),coconut_milk:ingredient('coconut_milk','Hindistan cevizi sütü',230,2.3,5.5,23.8,2.2),tahini:ingredient('tahini','Tahin',595,17,21.2,53.8,9.3),molasses:ingredient('molasses','Pekmez',290,0,74,0,0),boza:ingredient('boza','Boza',87,3.5,17,.5,1),black_tea:ingredient('black_tea','Siyah çay',1,0,.2,0,0),green_tea:ingredient('green_tea','Yeşil çay',1,0,.2,0,0),protein_plant:ingredient('protein_plant','Bitkisel protein',380,75,10,5,2)};
-export type NutritionInput={key:string;grams:number};export type NutritionResult={kcal:number;protein:number;carbs:number;fat:number;fiber:number;provenance:NutritionIngredient[]};
-export function calculateNutrition(items:NutritionInput[]):NutritionResult{const provenance:NutritionIngredient[]=[];const totals={kcal:0,protein:0,carbs:0,fat:0,fiber:0};for(const item of items){const n=INGREDIENTS[item.key];if(!n)throw new Error(`Nutrition ingredient not found: ${item.key}`);const f=item.grams/100;totals.kcal+=n.kcalPer100g*f;totals.protein+=n.proteinPer100g*f;totals.carbs+=n.carbsPer100g*f;totals.fat+=n.fatPer100g*f;totals.fiber+=n.fiberPer100g*f;if(!provenance.some(p=>p.key===n.key))provenance.push(n)}return{kcal:Math.round(totals.kcal*10)/10,protein:Math.round(totals.protein*10)/10,carbs:Math.round(totals.carbs*10)/10,fat:Math.round(totals.fat*10)/10,fiber:Math.round(totals.fiber*10)/10,provenance}}export function nutritionAudit(items:NutritionInput[]):NutritionResult{return calculateNutrition(items)}
+import { NUTRITION_SOURCES } from './nutritionSources';
+
+export type RecipeIngredient = {
+  key: string;
+  name: string;
+  amount: number;
+  unit: string;
+};
+
+export type NutritionIngredient = {
+  key: string;
+  name: string;
+  amount: number;
+  unit: string;
+  source: string;
+  confidence: number;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+};
+
+export type NutritionResult = {
+  ingredients: NutritionIngredient[];
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  source: string;
+  confidence: number;
+};
+
+export function calculateNutrition(ingredients: RecipeIngredient[], servings = 1): NutritionResult {
+  const normalizedServings = Math.max(1, servings);
+  const mapped = ingredients.map((item) => {
+    const n = INGREDIENTS[item.key];
+    if (!n) throw new Error(`Nutrition ingredient not found: ${item.key}`);
+    const ratio = item.amount / n.baseAmount;
+    return {
+      key: item.key,
+      name: n.name,
+      amount: item.amount,
+      unit: item.unit,
+      source: n.source,
+      confidence: n.confidence,
+      calories: n.calories * ratio,
+      protein: n.protein * ratio,
+      carbs: n.carbs * ratio,
+      fat: n.fat * ratio,
+    };
+  });
+  const total = mapped.reduce((a, x) => ({
+    calories: a.calories + x.calories,
+    protein: a.protein + x.protein,
+    carbs: a.carbs + x.carbs,
+    fat: a.fat + x.fat,
+  }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+  return {
+    ingredients: mapped,
+    calories: total.calories / normalizedServings,
+    protein: total.protein / normalizedServings,
+    carbs: total.carbs / normalizedServings,
+    fat: total.fat / normalizedServings,
+    source: mapped.length ? mapped.map((x) => x.source).join(', ') : NUTRITION_SOURCES.default,
+    confidence: mapped.length ? mapped.reduce((s, x) => s + x.confidence, 0) / mapped.length : 0,
+  };
+}
+
+export function nutritionAudit(ingredients: RecipeIngredient[], servings = 1) {
+  const result = calculateNutrition(ingredients, servings);
+  return {
+    source: result.source,
+    confidence: result.confidence,
+    ingredientCount: result.ingredients.length,
+    calories: result.calories,
+    protein: result.protein,
+    carbs: result.carbs,
+    fat: result.fat,
+  };
+}
+
+type NutritionEntry = {
+  name: string;
+  baseAmount: number;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  source: string;
+  confidence: number;
+};
+
+const INGREDIENTS: Record<string, NutritionEntry> = {
+  salt: { name: 'İyotlu tuz', baseAmount: 100, calories: 0, protein: 0, carbs: 0, fat: 0, source: NUTRITION_SOURCES.default, confidence: 0.99 },
+  rose: { name: 'Gül suyu', baseAmount: 100, calories: 0, protein: 0, carbs: 0, fat: 0, source: NUTRITION_SOURCES.default, confidence: 0.95 },
+};
