@@ -9,17 +9,16 @@ export interface AppVersionInfo {
 }
 
 export const APP_VERSION: AppVersionInfo = {
-  versionName: '1.0.16',
-  versionCode: 17,
+  versionName: '1.0.17',
+  versionCode: 18,
   releaseDate: '2026-09-06',
   minSupportedVersion: '1.0.3',
   apkUrl: 'https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest/download/WillyKiloTakip.apk',
   githubReleaseUrl: 'https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest',
   releaseNotes: [
-    'Production sürüm zinciri 1.0.16 / versionCode 17 olarak hizalandı',
-    'Gemini kota/billing hatalarında deterministik ücretsiz AI fallback güçlendirildi',
-    'OTA, uygulama içi sürüm ve Android versionCode tek sözleşmede hizalandı',
-    'Gerçek Gemini AI Willy Koç ve Yemek Analizi korunur; sağlayıcı başarısızlığında güvenli yerel fallback çalışır',
-    'Kalıcı release imzası ve OTA güncelleme zinciri korunur',
+    'On-device ML Kit görsel etiketleme köprüsü eklendi',
+    'Gemini kotası yokken cihaz içi görsel etiketleme + yerel beslenme fallback zinciri eklendi',
+    'Fotoğraf sonucu güven skoru ve doğrulanmamış porsiyon uyarıları korunur',
+    'OTA, uygulama içi sürüm ve Android versionCode hizalandı',
   ],
 };
