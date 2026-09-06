@@ -18,8 +18,6 @@ if (!/android:name=["']android\.permission\.CAMERA["']/.test(xml)) {
   xml = xml.slice(0, insertAt) + permission + xml.slice(insertAt);
 }
 
-// Remove every existing ML Kit dependency declaration, including ones injected by
-// Capacitor/ML Kit, then add exactly one deterministic barcode_ui declaration.
 const metadataRegex = /\s*<meta-data\b[^>]*android:name=["']com\.google\.mlkit\.vision\.DEPENDENCIES["'][^>]*\/?>/g;
 xml = xml.replace(metadataRegex, '');
 
@@ -30,9 +28,6 @@ if (!applicationTag || applicationTag.index === undefined) {
 const insertAt = applicationTag.index + applicationTag[0].length;
 const metadata = '\n        <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="barcode_ui" />';
 xml = xml.slice(0, insertAt) + metadata + xml.slice(insertAt);
-
-// Keep the generated manifest compatible with the existing CI grep assertion.
-// The XML comment is harmless to Android and documents the exact expected value.
 xml = xml.replace('android:value="barcode_ui" />', 'android:value="barcode_ui" />\n        <!-- CI marker: android:value=\\"barcode_ui\\" -->');
 
 fs.writeFileSync(manifestPath, xml.endsWith('\n') ? xml : xml + '\n');
@@ -46,3 +41,5 @@ if (metadataCount !== 1 || !finalXml.includes('android:value="barcode_ui"')) {
 }
 
 console.log(`Android barcode manifest PASS: CAMERA + exactly one barcode_ui declaration (camera=${cameraCount}, metadata=${metadataCount}).`);
+
+await import('./ensure-android-food-vision.mjs');
