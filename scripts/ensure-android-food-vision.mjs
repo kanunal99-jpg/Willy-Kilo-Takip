@@ -23,8 +23,6 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.util.Base64;
 
-import androidx.annotation.NonNull;
-
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -44,18 +42,12 @@ public class OnDeviceFoodVisionPlugin extends Plugin {
     @PluginMethod
     public void processImage(PluginCall call) {
         String raw = call.getString("imageBase64", "");
-        if (raw.isEmpty()) {
-            call.reject("imageBase64 is required");
-            return;
-        }
+        if (raw.isEmpty()) { call.reject("imageBase64 is required"); return; }
         try {
             String encoded = raw.contains(",") ? raw.substring(raw.indexOf(',') + 1) : raw;
             byte[] bytes = Base64.decode(encoded, Base64.DEFAULT);
             Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-            if (bitmap == null) {
-                call.reject("Could not decode image");
-                return;
-            }
+            if (bitmap == null) { call.reject("Could not decode image"); return; }
             InputImage image = InputImage.fromBitmap(bitmap, 0);
             ImageLabelerOptions options = new ImageLabelerOptions.Builder()
                     .setConfidenceThreshold(0.55f)
@@ -93,21 +85,19 @@ if (!fs.existsSync(mainActivityPath)) throw new Error(`MainActivity not found: $
 let mainActivity = fs.readFileSync(mainActivityPath, 'utf8');
 if (!mainActivity.includes('OnDeviceFoodVisionPlugin')) {
   mainActivity = mainActivity.replace(/^(package [^;]+;\n)/, `$1\nimport com.willy.kilotakip.foodvision.OnDeviceFoodVisionPlugin;\n`);
-  if (mainActivity.includes('public class MainActivity extends BridgeActivity')) {
-    mainActivity = mainActivity.replace(
-      'public class MainActivity extends BridgeActivity {',
-      'public class MainActivity extends BridgeActivity {\n    @Override\n    public void onCreate(android.os.Bundle savedInstanceState) {\n        registerPlugin(OnDeviceFoodVisionPlugin.class);\n        super.onCreate(savedInstanceState);\n    }'
-    );
-  } else {
-    throw new Error('Unexpected MainActivity shape');
-  }
+  const classMarker = 'public class MainActivity extends BridgeActivity {';
+  if (!mainActivity.includes(classMarker)) throw new Error('Unexpected MainActivity shape');
+  mainActivity = mainActivity.replace(classMarker, `${classMarker}\n    @Override\n    public void onCreate(android.os.Bundle savedInstanceState) {\n        registerPlugin(OnDeviceFoodVisionPlugin.class);\n        super.onCreate(savedInstanceState);\n    }`);
   fs.writeFileSync(mainActivityPath, mainActivity);
 }
 
 if (fs.existsSync(manifestPath)) {
   let manifest = fs.readFileSync(manifestPath, 'utf8');
   if (!manifest.includes('android.permission.CAMERA')) {
-    manifest = manifest.replace('<manifest', '<manifest\n    <uses-permission android:name="android.permission.CAMERA" />');
+    if (!manifest.includes('xmlns:android=')) {
+      manifest = manifest.replace('<manifest', '<manifest xmlns:android="http://schemas.android.com/apk/res/android"');
+    }
+    manifest = manifest.replace('>\n', '>\n    <uses-permission android:name="android.permission.CAMERA" />\n', 1);
     fs.writeFileSync(manifestPath, manifest);
   }
 }
