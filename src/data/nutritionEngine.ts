@@ -57,6 +57,9 @@ export const INGREDIENTS: Record<string, IngredientNutrition> = {
   sugar: { key:'sugar', name:'Toz şeker', kcalPer100g:387, proteinPer100g:0, carbsPer100g:100, fatPer100g:0, fiberPer100g:0, source:'USDA_FDC_REFERENCE', sourceUrl:USDA, confidence:'reference' },
   oats: { key:'oats', name:'Yulaf', kcalPer100g:389, proteinPer100g:16.9, carbsPer100g:66.3, fatPer100g:6.9, fiberPer100g:10.6, source:'USDA_FDC_REFERENCE', sourceUrl:USDA, confidence:'reference' },
   protein: { key:'protein', name:'Protein tozu', kcalPer100g:400, proteinPer100g:80, carbsPer100g:8, fatPer100g:6, fiberPer100g:2, source:'USDA_FDC_REFERENCE', sourceUrl:USDA, confidence:'reference' },
+  // Salt contributes negligible macronutrients at recipe quantities; it is kept
+  // as an explicit reference ingredient so nutrition provenance remains complete.
+  salt: { key:'salt', name:'İyotlu tuz', kcalPer100g:0, proteinPer100g:0, carbsPer100g:0, fatPer100g:0, fiberPer100g:0, source:'USDA_FDC_REFERENCE', sourceUrl:USDA, confidence:'reference' },
 };
 
 export function calculateNutrition(ingredients: RecipeIngredient[], volumeMl: number): CalculatedNutrition {
