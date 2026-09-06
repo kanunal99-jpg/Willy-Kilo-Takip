@@ -1,9 +1,15 @@
 {
-  "versionName": "1.0.15",
-  "versionCode": 16,
+  "versionName": "1.0.16",
+  "versionCode": 17,
   "releaseDate": "2026-09-06",
   "minSupportedVersion": "1.0.3",
   "apkUrl": "https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest/download/WillyKiloTakip.apk",
   "githubReleaseUrl": "https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest",
-  "releaseNotes": ["Intent-aware Willy AI local fallback","4 farklı soru için farklı ve konuya uygun cevap zinciri","Gemini Free Tier başarısız olduğunda ücretsiz güvenli fallback", "Sürüm zinciri monotonic release"]
+  "releaseNotes": [
+    "Production sürüm zinciri 1.0.16 / versionCode 17 olarak hizalandı",
+    "Gemini kota/billing hatalarında deterministik ücretsiz AI fallback güçlendirildi",
+    "OTA, uygulama içi sürüm ve Android versionCode tek sözleşmede hizalandı",
+    "Gerçek Gemini AI Willy Koç ve Yemek Analizi korunur; sağlayıcı başarısızlığında güvenli yerel fallback çalışır",
+    "Kalıcı release imzası ve OTA güncelleme zinciri korunur"
+  ]
 }

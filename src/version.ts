@@ -9,17 +9,17 @@ export interface AppVersionInfo {
 }
 
 export const APP_VERSION: AppVersionInfo = {
-  versionName: '1.0.11',
-  versionCode: 12,
+  versionName: '1.0.16',
+  versionCode: 17,
   releaseDate: '2026-09-06',
   minSupportedVersion: '1.0.3',
   apkUrl: 'https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest/download/WillyKiloTakip.apk',
   githubReleaseUrl: 'https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest',
   releaseNotes: [
-    'Yemek Tarifleri bölümüne Alkolsüz Tarifler filtresi eklendi',
-    'Alkolsüz katalogda 7 hazır tarif ve detayları eklendi',
-    'Alkolsüz tarifler çevrimdışı çalışacak şekilde yerel katalog olarak eklendi',
-    'Mevcut AI Tarif Üret akışı ve tarif kataloğu korunur',
-    'Üretim API ve ML Kit barkod kamera desteği korunur',
+    'Production sürüm zinciri 1.0.16 / versionCode 17 olarak hizalandı',
+    'Gemini kota/billing hatalarında deterministik ücretsiz AI fallback güçlendirildi',
+    'OTA, uygulama içi sürüm ve Android versionCode tek sözleşmede hizalandı',
+    'Gerçek Gemini AI Willy Koç ve Yemek Analizi korunur; sağlayıcı başarısızlığında güvenli yerel fallback çalışır',
+    'Kalıcı release imzası ve OTA güncelleme zinciri korunur',
   ],
 };
