@@ -1,7 +1,6 @@
 import { DailyData, FastingSession, FoodItem, Recipe, UserProfile, WeightRecord } from '../types';
 import { INITIAL_USER_PROFILE, RECIPES_DATABASE } from '../data/mockData';
 import { TURKOMP_VERIFIED_FOODS } from '../data/turkompVerifiedFoods';
-import { runDataMigration } from './dataMigration';
 
 const STORAGE_KEYS = {
   PROFILE: 'willy_user_profile', DAILY_LOGS: 'willy_daily_logs', FASTING_SESSIONS: 'willy_fasting_sessions',
@@ -76,19 +75,14 @@ export const loadFoods = (): FoodItem[] => {
       if (Array.isArray(parsed) && parsed.length > 0) return mergeVerifiedFoods(parsed);
     }
   } catch (e) { console.error('Failed to load foods:', e); }
-  runDataMigration();
-  try {
-    const raw = localStorage.getItem(STORAGE_KEYS.FOOD_DATABASE);
-    if (raw) return mergeVerifiedFoods(JSON.parse(raw));
-  } catch {}
+  // Legacy local migration/catalog was removed; use the verified packaged set and current API/catalog engines.
   return mergeVerifiedFoods([]);
 };
 export const saveFoods = (foods: FoodItem[]): void => { try { localStorage.setItem(STORAGE_KEYS.FOOD_DATABASE, JSON.stringify(foods)); } catch (e) { console.error('Failed to save foods:', e); } };
 
 export const loadRecipes = (): Recipe[] => {
   try { const raw = localStorage.getItem(STORAGE_KEYS.CUSTOM_RECIPES); if (raw) { const parsed = JSON.parse(raw); if (Array.isArray(parsed) && parsed.length > 0) return parsed; } } catch (e) { console.error('Failed to load recipes:', e); }
-  runDataMigration();
-  try { const raw = localStorage.getItem(STORAGE_KEYS.CUSTOM_RECIPES); if (raw) return JSON.parse(raw); } catch {}
+  // Legacy migration is removed; bundled recipes remain the safe local fallback.
   return RECIPES_DATABASE;
 };
 export const saveRecipes = (recipes: Recipe[]): void => { try { localStorage.setItem(STORAGE_KEYS.CUSTOM_RECIPES, JSON.stringify(recipes)); } catch (e) { console.error('Failed to save recipes:', e); } };
