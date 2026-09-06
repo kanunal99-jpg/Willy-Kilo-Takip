@@ -49,7 +49,7 @@ try {
     if (r.variant) variants.add(r.variant);
     volumes.add(r.volumeMl);
     const ingredientSignature = (r.ingredients ?? []).map(x => `${x.key ?? x.name ?? ''}:${x.grams ?? x.amount ?? ''}`).sort().join(',');
-    const sig = `${category}|${r.variant}|${r.volumeMl}|${ingredientSignature}`;
+    const sig = `${category}|${r.title}|${r.variant}|${r.volumeMl}|${ingredientSignature}`;
     if (signatures.has(sig)) throw new Error(`DUPLICATE_RECIPE_SIGNATURE:${r?.id}`);
     signatures.add(sig);
   }
