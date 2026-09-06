@@ -21,6 +21,26 @@ fs.writeFileSync(file,source,'utf8');
 
 const enginePath='src/data/beverageRecipeEngine.ts';
 let engine=fs.readFileSync(enginePath,'utf8');
+const additions=[
+  ["Ayran","lime","Misket limonu",.02],
+  ["Limonata","lime","Misket limonu",.12],
+  ["Şerbet","pomegranate","Nar",.20],
+  ["Smoothie","coconut","Hindistan cevizi",.18],
+  ["Komposto","date","Hurma",.18],
+  ["Milkshake","chocolate","Bitter çikolata",.03],
+  ["Kahve","coconut","Hindistan cevizi",.02],
+  ["Çay","clove","Karanfil",.003],
+  ["Bitki Çayı","turmeric","Zerdeçal",.004]
+];
+for (const [cat,key,name,factor] of additions) {
+  const needle=`'${cat}':[`;
+  const entry=`S('${key}','${name}',${factor}),`;
+  if (!engine.includes(entry)) {
+    const idx=engine.indexOf(needle);
+    if(idx<0) throw new Error(`BEVERAGE_CATEGORY_MISSING:${cat}`);
+    engine=engine.slice(0,idx+needle.length)+entry+engine.slice(idx+needle.length);
+  }
+}
 const before=engine;
 engine=engine.replace("if(variant==='Proteinli' && c!=='Protein İçecekleri')", "if(variant==='Proteinli' && ['Smoothie','Milkshake'].includes(c))");
 if(engine===before && !engine.includes("['Smoothie','Milkshake'].includes(c)"))throw new Error('PROTEIN_VARIANT_COMPATIBILITY_PATCH_FAILED');
