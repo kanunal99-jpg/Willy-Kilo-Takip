@@ -49,10 +49,7 @@ public class OnDeviceFoodVisionPlugin extends Plugin {
             Bitmap bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
             if (bitmap == null) { call.reject("Could not decode image"); return; }
             InputImage image = InputImage.fromBitmap(bitmap, 0);
-            ImageLabelerOptions options = new ImageLabelerOptions.Builder()
-                    .setConfidenceThreshold(0.55f)
-                    .setMaxResultCount(8)
-                    .build();
+            ImageLabelerOptions options = ImageLabelerOptions.DEFAULT_OPTIONS;
             ImageLabeler labeler = ImageLabeling.getClient(options);
             labeler.process(image)
                     .addOnSuccessListener(labels -> resolve(call, labels))
