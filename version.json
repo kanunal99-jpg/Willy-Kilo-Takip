@@ -6,11 +6,13 @@
   "apkUrl": "https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest/download/WillyKiloTakip.apk",
   "githubReleaseUrl": "https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest",
   "releaseNotes": [
-    "Alkolsüz İçecekler kataloğu ve filtre yapısı güncellendi",
-    "Willy Tarif adı ve detaylı PRO tarif bilgileri güncellendi",
-    "Miktar +/- ile malzeme ve besin değerleri ölçeklenir",
-    "İçecek tarifleri için tarif odaklı görsel eşleştirme altyapısı güncellendi",
-    "Mevcut AI Tarif Üret akışı ve tarif kataloğu korunur",
-    "Üretim API ve ML Kit barkod kamera desteği korunur"
+    "Yemek Tarifleri bölümüne Alkolsüz Tarifler filtresi eklendi",
+    "Alkolsüz katalogda detaylı tarif yapısı ve 14.000 tariflik üretim altyapısı eklendi",
+    "Ayran, Limonata, Şerbet, Smoothie, Komposto, Milkshake, Kahve, Çay, Bitki Çayı, Meyve İçecekleri, Detoks, Protein İçecekleri ve Yöresel İçecekler kategorileri eklendi",
+    "100 ml'den 3 L+ hacim filtreleri ve miktar ölçekleme desteği eklendi",
+    "Şekersiz, yüksek protein ve vegan filtreleri desteklendi",
+    "Willy Tarif adı ve tarif detayları güncellendi",
+    "Alkolsüz tarifler çevrimdışı çalışacak şekilde yerel katalog olarak eklendi",
+    "Mevcut AI Tarif Üret akışı, üretim API ve ML Kit barkod kamera desteği korunur"
   ]
 }
