@@ -16,29 +16,11 @@ type NutritionEntry = {
   confidence: 'reference' | 'estimated';
 };
 
-const ingredient = (
-  key: string,
-  name: string,
-  kcal: number,
-  protein: number,
-  carbs: number,
-  fat: number,
-  fiber: number,
-): NutritionEntry => ({
-  key,
-  name,
-  kcalPer100g: kcal,
-  proteinPer100g: protein,
-  carbsPer100g: carbs,
-  fatPer100g: fat,
-  fiberPer100g: fiber,
-  source: NUTRITION_SOURCES.default,
-  sourceUrl: USDA,
-  confidence: 'reference',
+const ingredient = (key: string, name: string, kcal: number, protein: number, carbs: number, fat: number, fiber: number): NutritionEntry => ({
+  key, name, kcalPer100g: kcal, proteinPer100g: protein, carbsPer100g: carbs, fatPer100g: fat, fiberPer100g: fiber,
+  source: NUTRITION_SOURCES.default, sourceUrl: USDA, confidence: 'reference',
 });
 
-// Canonical nutrient dictionary restored from the last complete nutrition-engine baseline.
-// Values are reference values per 100 g; water/ice/mineral water are zero-calorie entries.
 export const INGREDIENTS: Record<string, NutritionEntry> = {
   water: ingredient('water', 'Su', 0, 0, 0, 0, 0),
   honey: ingredient('honey', 'Bal', 304, 0.3, 82.4, 0, 0),
@@ -106,7 +88,6 @@ export const INGREDIENTS: Record<string, NutritionEntry> = {
   pear: ingredient('pear', 'Armut', 57, 0.4, 15.2, 0.1, 3.1),
   cherry: ingredient('cherry', 'Vişne', 50, 1, 12, 0.3, 1.6),
   sourcherry: ingredient('sourcherry', 'Ekşi vişne', 50, 1, 12, 0.3, 1.6),
-  peach: ingredient('peach', 'Şeftali', 39, 0.9, 9.5, 0.3, 1.5),
   apricot: ingredient('apricot', 'Kayısı', 48, 1.4, 11.1, 0.4, 2),
   plum: ingredient('plum', 'Erik', 46, 0.7, 11.4, 0.3, 1.4),
   tamarind: ingredient('tamarind', 'Demirhindi', 239, 2.8, 62.5, 0.6, 5.1),
@@ -155,7 +136,6 @@ export function calculateNutrition(items: CompatibleIngredient[], servings = 1):
     const item = toCanonical(raw);
     const n = INGREDIENTS[item.key];
     if (!n) throw new Error(`Nutrition ingredient not found: ${item.key}`);
-    // Current beverage engine provides gram-equivalent amounts. Unit normalization is kept at the boundary.
     const ratio = item.amount / 100;
     return {
       ...n,
@@ -167,16 +147,13 @@ export function calculateNutrition(items: CompatibleIngredient[], servings = 1):
     };
   });
 
-  const totals = mapped.reduce(
-    (a, x) => ({
-      calories: a.calories + x.calories,
-      protein: a.protein + x.proteinPer100g * (x.amount / 100),
-      carbs: a.carbs + x.carbsPer100g * (x.amount / 100),
-      fat: a.fat + x.fatPer100g * (x.amount / 100),
-      fiber: a.fiber + x.fiberPer100g * (x.amount / 100),
-    }),
-    { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 },
-  );
+  const totals = mapped.reduce((a, x) => ({
+    calories: a.calories + x.calories,
+    protein: a.protein + x.proteinPer100g * (x.amount / 100),
+    carbs: a.carbs + x.carbsPer100g * (x.amount / 100),
+    fat: a.fat + x.fatPer100g * (x.amount / 100),
+    fiber: a.fiber + x.fiberPer100g * (x.amount / 100),
+  }), { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 });
 
   const perServing = {
     calories: totals.calories / normalizedServings,
