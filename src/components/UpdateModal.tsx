@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { Browser } from '@capacitor/browser';
+import { Capacitor } from '@capacitor/core';
 import { X, RefreshCw, CheckCircle2, Download, AlertCircle, Sparkles, ExternalLink, ShieldCheck, ArrowUpCircle } from 'lucide-react';
 import { APP_VERSION } from '../version';
 
@@ -54,22 +56,18 @@ export const UpdateModal: React.FC<UpdateModalProps> = ({ isOpen, onClose, autoC
 
   if (!isOpen) return null;
 
-  const handleStartUpdate = () => {
+  const handleStartUpdate = async () => {
     if (!updateData?.apkUrl) return;
     setIsDownloading(true);
     setDownloadSuccess(false);
     try {
-      // GitHub's release asset is intentionally opened directly. Android can then
-      // hand the APK to its Download Manager / package installer.
-      const opened = window.open(updateData.apkUrl, '_blank', 'noopener,noreferrer');
-      if (!opened) {
-        const link = document.createElement('a');
-        link.href = updateData.apkUrl;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
+      // Capacitor WebView'de window.open APK indirmeyi güvenilir biçimde başlatmıyordu.
+      // Native Browser, Android'in gerçek tarayıcı/Download Manager akışını açar.
+      if (Capacitor.isNativePlatform()) {
+        await Browser.open({ url: updateData.apkUrl, toolbarColor: '#020617' });
+      } else {
+        const opened = window.open(updateData.apkUrl, '_blank', 'noopener,noreferrer');
+        if (!opened) window.location.href = updateData.apkUrl;
       }
       setDownloadSuccess(true);
     } catch (err) {
