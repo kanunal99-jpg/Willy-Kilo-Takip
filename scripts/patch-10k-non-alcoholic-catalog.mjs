@@ -37,10 +37,10 @@ if (!beverage.includes('const ALCOHOL_BLACKLIST =')) {
   beverage = beverage.replace("const vl=(n:number)=>n>=1000?`${n/1000} L`:`${n} ml`;", "const vl=(n:number)=>n>=1000?`${n/1000} L`:`${n} ml`;" + guard);
 }
 
-const beforeReturn = " const tags=['Alkolsüz',c,f,variant,...purposes];";
-const afterReturn = " const tags=['Alkolsüz',c,f,variant,...purposes];\n assertAlcoholFree([c,f,variant,...ingredientsForRecipe.map(x=>x.name),...tags].join(' '));";
-if (beverage.includes(beforeReturn) && !beverage.includes(afterReturn)) {
-  beverage = beverage.replace(beforeReturn, afterReturn);
+const beforeGuard = " const tags=['Alkolsüz',c,f,variant,...purposes];";
+const afterGuard = " const tags=['Alkolsüz',c,f,variant,...purposes];\n assertAlcoholFree([c,f,variant,...ingredients.map(x=>x.name),...tags].join(' '));";
+if (beverage.includes(beforeGuard) && !beverage.includes(afterGuard)) {
+  beverage = beverage.replace(beforeGuard, afterGuard);
 }
 
 fs.writeFileSync(beverageFile, beverage, 'utf8');
