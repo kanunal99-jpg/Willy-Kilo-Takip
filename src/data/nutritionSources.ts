@@ -1,5 +1,5 @@
-export const USDA = 'https://fdc.nal.usda.gov/';
+// Nutrition data is embedded in the app's own catalog.
+// No source URL or source page is exposed to end users.
 export const NUTRITION_SOURCES = {
-  default: 'USDA_FDC_REFERENCE',
-  USDA,
+  default: 'EMBEDDED_CATALOG',
 } as const;
