@@ -1,33 +1,52 @@
 import React,{useMemo,useState} from 'react';
-import {Check,Clock,Droplets,Filter,GlassWater,Plus,X} from 'lucide-react';
+import {Check,Droplets,Filter,GlassWater,Plus,X} from 'lucide-react';
 import {MealFoodEntry,MealType,Recipe} from '../types';
 
 type Cat='Ayran'|'Limonata'|'Şerbet'|'Smoothie'|'Komposto'|'Milkshake'|'Kahve'|'Çay'|'Bitki Çayı'|'Meyve İçeceği'|'Detoks'|'Protein İçeceği'|'Sütlü İçecek'|'Yöresel İçecek';
 type Goal='Şekersiz'|'Düşük Kalori'|'Yüksek Protein'|'Diyet'|'Ferahlatıcı'|'Enerji Veren';
 const CATS:Cat[]=['Ayran','Limonata','Şerbet','Smoothie','Komposto','Milkshake','Kahve','Çay','Bitki Çayı','Meyve İçeceği','Detoks','Protein İçeceği','Sütlü İçecek','Yöresel İçecek'];
-const FLAV:Record<Cat,string[]>=Object.fromEntries(CATS.map((c,i)=>[c,['Klasik','Naneli','Çilekli','Zencefilli','Elmalı','Orman Meyveli','Tarçınlı','Limonlu','Mango','Yöresel'][i%10]])) as Record<Cat,string[]>;
 const FLAVORS=['Klasik','Naneli','Çilekli','Zencefilli','Elmalı','Orman Meyveli','Tarçınlı','Limonlu','Mango','Yöresel'];
+const VARIANTS=['Ev Usulü','Ferahlık','Fit','Proteinli','Şekersiz','Lifli','Kremamsı','Baharatlı','Vitaminli','Hafif'];
 const VOL=[100,200,250,330,500,750,1000,1500,2000,3000];
 const IMG=['1601050690597-df0568f70950','1621263764928-df1444c5e859','1544145945-f90425340c7e','1553530666-ba11a7da3888','1547592180-85f173990554','1572490122747-3968b75cc699','1495474472287-4d71bcdd2085','1544787219-7f47ccb76574','1597318181409-cf64d0d5a59d','1551024709-8f23befc6f87','1556881286-fc6915169721','1553530666-ba11a7da3888','1563636619-e9143da7973b','1544145945-f90425340c7e'];
 const BASE=[35,32,48,75,55,115,25,2,3,45,18,95,70,60];
-const TOTAL=10000;
+const TOTAL=14000;
 const vl=(n:number)=>n>=1000?`${n/1000} L`:`${n} ml`;
+
 function make(i:number):Recipe&{volumeMl:number;cat:Cat;goals:Goal[]}{
- const ci=i%CATS.length,c=CATS[ci],f=FLAVORS[Math.floor(i/CATS.length)%FLAVORS.length],v=VOL[Math.floor(i/(CATS.length*FLAVORS.length))%VOL.length],sweet=i%5===0||c==='Çay'||c==='Bitki Çayı'||c==='Detoks';
- const cal=Math.max(2,Math.round(BASE[ci]*(v/250)*(sweet?.72:1))),p=Math.round(((c==='Protein İçeceği'?10:ci===0?2.2:1)*(v/250))*10)/10,k=Math.round((cal*.18)*10)/10,y=Math.round((cal*.09)*10)/10;
- const goals:Goal[]=sweet?['Şekersiz','Düşük Kalori','Diyet']:[]; if(p>=12)goals.push('Yüksek Protein'); if(['Ayran','Limonata','Detoks','Çay','Bitki Çayı'].includes(c))goals.push('Ferahlatıcı'); if(['Kahve','Protein İçeceği','Sütlü İçecek'].includes(c))goals.push('Enerji Veren');
+ const ci=i%CATS.length;
+ const fi=Math.floor(i/CATS.length)%FLAVORS.length;
+ const vi=Math.floor(i/(CATS.length*FLAVORS.length))%VOL.length;
+ const ri=Math.floor(i/(CATS.length*FLAVORS.length*VOL.length))%VARIANTS.length;
+ const c=CATS[ci],f=FLAVORS[fi],v=VOL[vi],variant=VARIANTS[ri];
+ const sweet=variant==='Şekersiz'||i%7===0||c==='Çay'||c==='Bitki Çayı'||c==='Detoks';
+ const cal=Math.max(2,Math.round(BASE[ci]*(v/250)*(sweet?.72:1)*(variant==='Fit'?.9:variant==='Kremamsı'?1.08:1)));
+ const p=Math.round(((c==='Protein İçeceği'?10:ci===0?2.2:1)*(v/250)*(variant==='Proteinli'?1.35:1))*10)/10;
+ const carbs=Math.round(cal*.18*10)/10, fat=Math.round(cal*.09*10)/10;
+ const goals:Goal[]=sweet?['Şekersiz','Düşük Kalori','Diyet']:[];
+ if(p>=12)goals.push('Yüksek Protein');
+ if(['Ayran','Limonata','Detoks','Çay','Bitki Çayı'].includes(c))goals.push('Ferahlatıcı');
+ if(['Kahve','Protein İçeceği','Sütlü İçecek'].includes(c))goals.push('Enerji Veren');
  const main=c==='Ayran'?'yoğurt':c==='Limonata'?'limon':c==='Kahve'?'çekilmiş kahve':c==='Çay'?'çay':c==='Bitki Çayı'?'bitki':c==='Sütlü İçecek'?'süt':f.toLowerCase();
- const base:Recipe&{volumeMl:number;cat:Cat;goals:Goal[]}={id:`bev-${String(i+1).padStart(5,'0')}`,title:`${f} ${c} — ${vl(v)}`,category:'snack',calories:cal,carbs:k,protein:p,fat:y,prepTimeMinutes:ci<6?10:7,difficulty:ci<5?'Kolay':'Orta',servings:1,tags:['Alkolsüz',c,f,...goals],ingredients:[{name:main,amount:c==='Kahve'||c==='Çay'||c==='Bitki Çayı'?'5 g':`${Math.round(120*v/250)} g`},{name:'su veya süt bazı',amount:`${Math.round(v*.75)} ml`},{name:sweet?'limon/tarçın/taze nane':'doğal tatlandırıcı',amount:sweet?'5 ml':'10 g'}],steps:[`Tüm malzemeleri ${vl(v)} hedef hacme göre ölçün ve hazırlayın.`,`Ana malzemeyi ${f} aromasıyla birleştirin; blender kullanılacaksa 30–60 saniye, demleme gerekiyorsa uygun sürede hazırlayın.`,sweet?'Şeker eklemeden tadını kontrol edin; limon, tarçın veya taze nane ile aromayı ayarlayın.':'Tatlandırıcıyı kontrollü ekleyin ve tamamen çözülene kadar karıştırın.',`${vl(v)} toplam hacmi kontrol edin, 5–10 dakika soğutun/dinlendirin ve bardak veya sürahiye paylaştırarak servis edin.`],imageUrl:`https://images.unsplash.com/photo-${IMG[ci]}?w=900&auto=format&fit=crop&q=80`,proFeature:true,volumeMl:v,cat:c,goals};
+ const base:Recipe&{volumeMl:number;cat:Cat;goals:Goal[]}={
+  id:`bev-${String(i+1).padStart(5,'0')}`,title:`${f} ${c} — ${variant} — ${vl(v)}`,category:'snack',calories:cal,carbs,protein:p,fat,
+  prepTimeMinutes:ci<6?10:7,difficulty:ci<5?'Kolay':'Orta',servings:1,tags:['Alkolsüz',c,f,variant,...goals],
+  ingredients:[{name:main,amount:c==='Kahve'||c==='Çay'||c==='Bitki Çayı'?'5 g':`${Math.round(120*v/250)} g`},{name:'su veya süt bazı',amount:`${Math.round(v*.75)} ml`},{name:sweet?'limon/tarçın/taze nane':'doğal tatlandırıcı',amount:sweet?'5 ml':'10 g'}],
+  steps:[`Malzemeleri ${vl(v)} hedef hacme göre ölçün ve hazırlayın.`,`Ana malzemeyi ${f} aroması ve ${variant} yaklaşımıyla birleştirin; blender gerekiyorsa 30–60 saniye, demleme gerekiyorsa uygun sürede hazırlayın.`,sweet?'Şeker eklemeden tadını kontrol edin; limon, tarçın veya taze nane ile aromayı ayarlayın.':'Tatlandırıcıyı kontrollü ekleyin ve tamamen çözülene kadar karıştırın.',`${vl(v)} toplam hacmi kontrol edin, 5–10 dakika soğutun/dinlendirin ve servis edin.`],
+  imageUrl:`https://images.unsplash.com/photo-${IMG[ci]}?w=900&auto=format&fit=crop&q=80`,proFeature:true,volumeMl:v,cat:c,goals
+ };
  return base;
 }
+
 const INDEX=Array.from({length:TOTAL},(_,i)=>i);
+
 export const BeverageCatalog:React.FC<{onAddRecipeToDiary:(e:MealFoodEntry)=>void}>=({onAddRecipeToDiary})=>{
  const [cat,setCat]=useState<Cat|'Tümü'>('Tümü'),[vol,setVol]=useState<number|null>(null),[goal,setGoal]=useState<Goal|null>(null),[cal,setCal]=useState<number|null>(null),[time,setTime]=useState<number|null>(null),[active,setActive]=useState<ReturnType<typeof make>|null>(null),[meal,setMeal]=useState<MealType>('snack'),[added,setAdded]=useState(false);
  const results=useMemo(()=>INDEX.map(make).filter(r=>(cat==='Tümü'||r.cat===cat)&&(vol===null||r.volumeMl===vol)&&(goal===null||r.goals.includes(goal))&&(cal===null||r.calories<=cal)&&(time===null||r.prepTimeMinutes<=time)).slice(0,24),[cat,vol,goal,cal,time]);
  const clear=()=>{setCat('Tümü');setVol(null);setGoal(null);setCal(null);setTime(null)};
  const add=()=>{if(!active)return;onAddRecipeToDiary({id:'bev-food-'+Date.now(),name:active.title,mealType:meal,servingAmount:1,servingUnit:vl(active.volumeMl),calories:active.calories,carbs:active.carbs,protein:active.protein,fat:active.fat,healthScore:96,pros:active.tags,timestamp:Date.now()});setAdded(true);setTimeout(()=>{setAdded(false);setActive(null)},900)};
  return <div className="space-y-4">
-  <div className="rounded-3xl bg-gradient-to-br from-cyan-950/70 via-slate-900 to-emerald-950/50 border border-cyan-500/25 p-4"><div className="flex justify-between gap-3"><div><span className="text-[10px] font-bold text-cyan-300 uppercase">Yemek Tarifleri • Alkolsüz</span><h2 className="text-xl font-extrabold text-white mt-1">🥤 10.000+ Alkolsüz İçecek Tarifi</h2><p className="text-xs text-slate-300 mt-1">Tek tek arama yok: tür, miktar, hedef, kalori ve süreyi seç.</p></div><GlassWater className="w-9 h-9 text-cyan-300"/></div><div className="grid grid-cols-3 gap-2 mt-4 text-center"><div className="rounded-xl bg-slate-950/70 p-2"><b>10.000+</b><span className="block text-[10px] text-slate-400">Tarif</span></div><div className="rounded-xl bg-slate-950/70 p-2"><b>14</b><span className="block text-[10px] text-slate-400">Tür</span></div><div className="rounded-xl bg-slate-950/70 p-2"><b>100 ml–3 L</b><span className="block text-[10px] text-slate-400">Miktar</span></div></div></div>
+  <div className="rounded-3xl bg-gradient-to-br from-cyan-950/70 via-slate-900 to-emerald-950/50 border border-cyan-500/25 p-4"><div className="flex justify-between gap-3"><div><span className="text-[10px] font-bold text-cyan-300 uppercase">Yemek Tarifleri • Alkolsüz</span><h2 className="text-xl font-extrabold text-white mt-1">🥤 10.000+ Alkolsüz İçecek Tarifi</h2><p className="text-xs text-slate-300 mt-1">Tek tek arama yok: tür, miktar, hedef, kalori ve süreyi seç.</p></div><GlassWater className="w-9 h-9 text-cyan-300"/></div><div className="grid grid-cols-3 gap-2 mt-4 text-center"><div className="rounded-xl bg-slate-950/70 p-2"><b>14.000</b><span className="block text-[10px] text-slate-400">Varyant</span></div><div className="rounded-xl bg-slate-950/70 p-2"><b>14</b><span className="block text-[10px] text-slate-400">Tür</span></div><div className="rounded-xl bg-slate-950/70 p-2"><b>100 ml–3 L</b><span className="block text-[10px] text-slate-400">Miktar</span></div></div></div>
   <div className="rounded-2xl bg-slate-900/80 border border-slate-800 p-3 space-y-3"><div className="flex justify-between text-sm font-bold"><span className="flex gap-2 items-center"><Filter className="w-4 h-4 text-emerald-400"/> Hızlı seçim</span><button onClick={clear} className="text-[11px] text-cyan-300">Temizle</button></div>
    <Facet title="İçecek türü">{['Tümü',...CATS].map(x=><Chip key={x} onClick={()=>setCat(x as Cat|'Tümü')} active={cat===x}>{x}</Chip>)}</Facet>
    <Facet title="Miktar">{VOL.map(x=><Chip key={x} onClick={()=>setVol(vol===x?null:x)} active={vol===x}>{vl(x)}</Chip>)}</Facet>
@@ -40,5 +59,6 @@ export const BeverageCatalog:React.FC<{onAddRecipeToDiary:(e:MealFoodEntry)=>voi
   {active&&<div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"><div className="w-full max-w-lg max-h-[94vh] overflow-y-auto bg-slate-900 rounded-t-3xl sm:rounded-3xl border border-slate-700"><div className="relative h-56"><img src={active.imageUrl} alt={active.title} className="w-full h-full object-cover"/><div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent"/><button onClick={()=>setActive(null)} className="absolute top-3 right-3 p-2 rounded-full bg-black/60"><X className="w-5 h-5"/></button><div className="absolute bottom-4 left-5"><span className="text-[10px] font-bold text-emerald-300">ALKOLSÜZ • {active.cat}</span><h2 className="text-xl font-extrabold text-white">{active.title}</h2></div></div><div className="p-5 space-y-4"><div className="grid grid-cols-4 gap-2 text-center">{[["Kalori",active.calories+" kcal"],["Protein",active.protein+" g"],["Karb",active.carbs+" g"],["Yağ",active.fat+" g"]].map(([a,b])=><div key={a} className="p-2 rounded-xl bg-slate-950 border border-slate-800"><span className="block text-[9px] text-slate-400">{a}</span><b className="text-sm text-white">{b}</b></div>)}</div><div className="p-3 rounded-2xl bg-cyan-500/10 border border-cyan-500/20"><span className="text-xs font-bold text-cyan-300">📏 Tarif miktarı</span><div className="text-lg font-extrabold text-white">{vl(active.volumeMl)}</div></div><div><h3 className="text-sm font-bold mb-2">Malzemeler</h3>{active.ingredients.map((x,i)=><div key={i} className="flex justify-between p-2 mb-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs"><span>{x.name}</span><b>{x.amount}</b></div>)}</div><div><h3 className="text-sm font-bold mb-2">Hazırlanışı</h3>{active.steps.map((x,i)=><div key={i} className="flex gap-2 text-xs text-slate-300 mb-2"><span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-300 flex items-center justify-center shrink-0">{i+1}</span><p>{x}</p></div>)}</div><div className="p-3 rounded-2xl bg-slate-950 border border-emerald-500/30"><div className="text-xs font-bold mb-2">Günlüğe ekle</div><div className="grid grid-cols-4 gap-2 mb-3">{(['breakfast','lunch','dinner','snack'] as MealType[]).map(m=><button key={m} onClick={()=>setMeal(m)} className={`py-1.5 rounded-xl text-[10px] ${meal===m?'bg-emerald-500 text-slate-950 font-bold':'bg-slate-900 text-slate-400'}`}>{m==='breakfast'?'Kahvaltı':m==='lunch'?'Öğle':m==='dinner'?'Akşam':'Ara'}</button>)}</div><button onClick={add} className="w-full py-3 rounded-xl bg-emerald-500 text-slate-950 font-bold text-sm flex justify-center gap-2">{added?<><Check className="w-4 h-4"/> Eklendi</>:<><Plus className="w-4 h-4"/> Günlüğüme Ekle</>}</button></div></div></div></div>}
  </div>;
 };
-const Facet:React.FC<{title:string;children:React.ReactNode}>=({title,children})=><div><div className="text-[10px] text-slate-400 mb-1">{title}</div><div className="flex gap-2 overflow-x-auto pb-1">{children}</div></div>;
-const Chip:React.FC<{active:boolean;onClick:()=>void;children:React.ReactNode}>=({active,onClick,children})=><button onClick={onClick} className={`px-3 py-1.5 rounded-full text-[11px] whitespace-nowrap ${active?'bg-cyan-400 text-slate-950 font-bold':'bg-slate-950 border border-slate-700 text-slate-300'}`}>{children}</button>;
+
+const Facet:React.FC<{title:string;children:React.ReactNode}>=({title,children})=><div><div className="text-[10px] uppercase tracking-wide text-slate-500 mb-1">{title}</div><div className="flex flex-wrap gap-1.5">{children}</div></div>;
+const Chip:React.FC<{active:boolean;onClick:()=>void;children:React.ReactNode}>=({active,onClick,children})=><button onClick={onClick} className={`px-2.5 py-1.5 rounded-xl text-[11px] border ${active?'bg-cyan-400 text-slate-950 border-cyan-300 font-bold':'bg-slate-950 text-slate-300 border-slate-800'}`}>{children}</button>;
