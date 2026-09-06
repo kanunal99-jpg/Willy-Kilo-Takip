@@ -1,0 +1,72 @@
+name: Production AI Smoke Tests
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  production-ai-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for Render deployment
+        run: sleep 120
+
+      - name: Test production health
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error --max-time 30 'https://willy-kilo-takip.onrender.com/api/health'
+
+      - name: Test four different coach questions
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, subprocess
+          questions = [
+              'Kilo vermem neden son haftalarda yavaşladı?',
+              'Akşam kavurma ve pilav yersem porsiyonu nasıl ayarlamalıyım?',
+              'Protein hedefimi gün içinde pratik olarak nasıl tamamlarım?',
+              'Bugün su hedefime ulaşmak için nasıl bir plan yapayım?'
+          ]
+          replies = []
+          for q in questions:
+              payload = json.dumps({
+                  'message': q,
+                  'userProfile': {'name':'SmokeTest','goal':'lose_weight','currentWeightKg':80,'targetWeightKg':75,'dailyCalorieTarget':2000,'waterTargetMl':2500},
+                  'todaySummary': {'consumedCalories':500,'burnedCalories':0,'waterMl':750,'fastingActive':False}
+              }, ensure_ascii=False)
+              result = subprocess.run([
+                  'curl','--fail-with-body','--silent','--show-error','--max-time','90','-X','POST',
+                  'https://willy-kilo-takip.onrender.com/api/ai/coach','-H','Content-Type: application/json','--data',payload
+              ], capture_output=True, text=True, check=True)
+              data = json.loads(result.stdout)
+              assert data.get('success') and data.get('reply'), data
+              replies.append(data['reply'])
+              print(json.dumps({'question':q,'provider':data.get('provider'),'model':data.get('model'),'fallback':data.get('fallback'),'reply':data['reply']}, ensure_ascii=False))
+          if len(set(replies)) < 4:
+              raise SystemExit('FAIL: different coach questions produced duplicate replies')
+          print('FOUR-QUESTION COACH SMOKE PASS')
+          PY
+
+      - name: Test production photo analysis fallback
+        run: |
+          set -euo pipefail
+          # 1x1 PNG. This verifies the real image POST path and the honest zero-cost fallback.
+          IMAGE_B64='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
+          payload=$(printf '{"imageBase64":"%s","mimeType":"image/png","description":"","mealType":"lunch"}' "$IMAGE_B64")
+          response=$(curl --fail-with-body --silent --show-error --max-time 90 -X POST 'https://willy-kilo-takip.onrender.com/api/ai/analyze-food' -H 'Content-Type: application/json' --data "$payload")
+          echo "$response"
+          RESPONSE="$response" python3 - <<'PY'
+          import json, os
+          r=json.loads(os.environ['RESPONSE'])
+          assert r.get('success') and r.get('data'), r
+          assert 'visualAnalyzed' in r, r
+          if r.get('provider') == 'local':
+              assert r.get('visualAnalyzed') is False, r
+              assert r.get('warning'), r
+          elif r.get('provider') == 'gemini':
+              assert r.get('visualAnalyzed') is True, r
+          else:
+              raise SystemExit(f'Unexpected provider: {r.get("provider")}')
+          print(f'PHOTO SMOKE PASS provider={r.get("provider")} visualAnalyzed={r.get("visualAnalyzed")}')
+          PY
