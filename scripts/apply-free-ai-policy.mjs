@@ -10,7 +10,94 @@ if (source.includes(marker)) {
 }
 
 const anchor = "function hasOpenAI(): boolean {\n  return !!process.env.OPENAI_API_KEY?.trim();\n}";
-const replacement = `function hasOpenAI(): boolean {\n  // Paid OpenAI is deliberately disabled in the zero-cost production policy.\n  return false;\n}\n\nconst USE_GEMINI_FREE_TIER = process.env.USE_GEMINI_FREE_TIER?.trim().toLowerCase() === 'true';\n\n// FREE_AI_POLICY_APPLIED\nfunction localFoodFallback(description = '', mealType = 'lunch') {\n  const text = String(description || '').toLocaleLowerCase('tr-TR');\n  const presets = [\n    { keys: ['salata', 'salata'], name: 'Karışık salata', calories: 180, protein: 6, carbs: 18, fat: 10, fiber: 6 },\n    { keys: ['çorba', 'corba'], name: 'Çorba', calories: 180, protein: 7, carbs: 24, fat: 6, fiber: 4 },\n    { keys: ['pilav', 'pirinç', 'pirinc'], name: 'Pilav', calories: 260, protein: 5, carbs: 50, fat: 5, fiber: 2 },\n    { keys: ['makarna'], name: 'Makarna', calories: 320, protein: 11, carbs: 55, fat: 8, fiber: 4 },\n    { keys: ['tavuk', 'chicken'], name: 'Tavuk yemeği', calories: 330, protein: 38, carbs: 12, fat: 14, fiber: 2 },\n    { keys: ['yumurta', 'omlet'], name: 'Yumurta / omlet', calories: 220, protein: 15, carbs: 4, fat: 16, fiber: 1 },\n    { keys: ['yoğurt', 'yogurt'], name: 'Yoğurt', calories: 120, protein: 7, carbs: 9, fat: 6, fiber: 0 },\n    { keys: ['sandviç', 'sandvic'], name: 'Sandviç', calories: 350, protein: 18, carbs: 42, fat: 13, fiber: 4 },\n  ];\n  const preset = presets.find((item) => item.keys.some((key) => text.includes(key))) || { name: 'Karışık öğün', calories: 420, protein: 22, carbs: 45, fat: 16, fiber: 6 };\n  return {\n    name: preset.name, calories: preset.calories, protein: preset.protein, carbs: preset.carbs, fat: preset.fat, fiber: preset.fiber,\n    healthScore: 78, pros: ['Yerel ücretsiz tahmin hazırlandı'], cons: ['Porsiyon ve fotoğraf ayrıntısı doğrulanmadı'],\n    advice: imageFallbackAdvice(description, mealType),\n    breakdown: [{ item: preset.name, calories: preset.calories, amount: 'standart porsiyon' }],\n  };\n}\n\nfunction imageFallbackAdvice(description, mealType) {\n  if (!description) return 'Ücretsiz yerel modda fotoğrafın görsel içeriği analiz edilemiyor. Daha doğru hesap için yemeğin adını ve yaklaşık porsiyonunu yazabilirsin.';\n  return \`\${mealType === 'breakfast' ? 'Kahvaltı' : mealType === 'dinner' ? 'Akşam' : 'Öğün'} için yerel tahmin yapıldı. Porsiyon gramını yazarsan kalori tahminini daha iyi ölçekleyebilirim.\`;\n}\n\nfunction localCoachFallback(userProfile, todaySummary, userMessage) {\n  const target = Number(userProfile?.dailyCalorieTarget) || 0;\n  const consumed = Number(todaySummary?.consumedCalories) || 0;\n  const water = Number(todaySummary?.waterMl) || 0;\n  const waterTarget = Number(userProfile?.waterTargetMl) || 2000;\n  const remaining = target > 0 ? Math.max(0, target - consumed) : null;\n  const tips = [];\n  if (remaining !== null && remaining < 300) tips.push('Kalan kalorini hafif ve protein ağırlıklı bir öğünle kullan.');\n  else if (remaining !== null) tips.push(\`Bugün yaklaşık \${remaining} kcal alanın kaldı; dengeli bir öğün planlayabilirsin.\`);\n  if (water < waterTarget) tips.push(\`Su hedefinin yaklaşık \${Math.round(waterTarget - water)} ml altındasın.\`);\n  else tips.push('Su hedefin iyi gidiyor; aynı tempoyu koru.');\n  return \`Willy ücretsiz yerel modda yanında. “\${userMessage.slice(0, 120)}” için hızlı değerlendirmem: \${tips.join(' ')} Küçük ve sürdürülebilir adımlar en iyisi.\`;\n}\n`;
+const replacement = `function hasOpenAI(): boolean {
+  // Paid OpenAI is deliberately disabled in the zero-cost production policy.
+  return false;
+}
+
+const USE_GEMINI_FREE_TIER = process.env.USE_GEMINI_FREE_TIER?.trim().toLowerCase() === 'true';
+
+// FREE_AI_POLICY_APPLIED
+function localFoodFallback(description = '', mealType = 'lunch') {
+  const text = String(description || '').toLocaleLowerCase('tr-TR');
+  const presets = [
+    { keys: ['salata'], name: 'Karışık salata', calories: 180, protein: 6, carbs: 18, fat: 10, fiber: 6 },
+    { keys: ['çorba', 'corba'], name: 'Çorba', calories: 180, protein: 7, carbs: 24, fat: 6, fiber: 4 },
+    { keys: ['pilav', 'pirinç', 'pirinc'], name: 'Pilav', calories: 260, protein: 5, carbs: 50, fat: 5, fiber: 2 },
+    { keys: ['makarna'], name: 'Makarna', calories: 320, protein: 11, carbs: 55, fat: 8, fiber: 4 },
+    { keys: ['tavuk', 'chicken'], name: 'Tavuk yemeği', calories: 330, protein: 38, carbs: 12, fat: 14, fiber: 2 },
+    { keys: ['yumurta', 'omlet'], name: 'Yumurta / omlet', calories: 220, protein: 15, carbs: 4, fat: 16, fiber: 1 },
+    { keys: ['yoğurt', 'yogurt'], name: 'Yoğurt', calories: 120, protein: 7, carbs: 9, fat: 6, fiber: 0 },
+    { keys: ['sandviç', 'sandvic'], name: 'Sandviç', calories: 350, protein: 18, carbs: 42, fat: 13, fiber: 4 },
+  ];
+  const preset = presets.find((item) => item.keys.some((key) => text.includes(key))) || { name: 'Karışık öğün', calories: 420, protein: 22, carbs: 45, fat: 16, fiber: 6 };
+  return {
+    name: preset.name, calories: preset.calories, protein: preset.protein, carbs: preset.carbs, fat: preset.fat, fiber: preset.fiber,
+    healthScore: 78, pros: ['Yerel ücretsiz tahmin hazırlandı'], cons: ['Porsiyon ve fotoğraf ayrıntısı doğrulanmadı'],
+    advice: imageFallbackAdvice(description, mealType),
+    breakdown: [{ item: preset.name, calories: preset.calories, amount: 'standart porsiyon' }],
+  };
+}
+
+function imageFallbackAdvice(description, mealType) {
+  if (!description) return 'Ücretsiz yerel modda fotoğrafın görsel içeriği analiz edilemiyor. Daha doğru hesap için yemeğin adını ve yaklaşık porsiyonunu yazabilirsin.';
+  return \`${mealType === 'breakfast' ? 'Kahvaltı' : mealType === 'dinner' ? 'Akşam' : 'Öğün'} için yerel tahmin yapıldı. Porsiyon gramını yazarsan kalori tahminini daha iyi ölçekleyebilirim.\`;
+}
+
+function localCoachFallback(userProfile, todaySummary, userMessage) {
+  const message = String(userMessage || '').trim();
+  const text = message.toLocaleLowerCase('tr-TR');
+  const target = Number(userProfile?.dailyCalorieTarget) || 0;
+  const consumed = Number(todaySummary?.consumedCalories) || 0;
+  const water = Number(todaySummary?.waterMl) || 0;
+  const waterTarget = Number(userProfile?.waterTargetMl) || 2000;
+  const remaining = target > 0 ? Math.max(0, target - consumed) : null;
+  const waterRemaining = Math.max(0, waterTarget - water);
+
+  // Deterministic intent router: different questions must produce different, relevant answers.
+  if (/(kahve|kafein|çay|cay)/.test(text) && /(oruç|oruc|fast)/.test(text)) {
+    return 'Oruç penceresinde sade kahve veya şekersiz çay genellikle kalori açısından çok düşük olduğu için tercih edilebilir; ancak süt, şeker ve şuruplar kalori ekler. Oruç protokolünün kuralları kişiden kişiye değişebileceği için kendi planını esas al. Baş dönmesi veya kötü hissetme olursa orucu zorlamama.';
+  }
+
+  if (/(kilo.*(yavaş|dur|verem)|yavaşladı|yavasladi|plato|plateau)/.test(text)) {
+    const remainingText = remaining === null ? 'Günlük kalori hedefini belirlediysen' : \`Bugün yaklaşık \${remaining} kcal alanın kaldı\`;
+    return \`Kilo kaybı yavaşladığında önce 1-2 haftalık gerçek trendi, porsiyonları ve günlük hareketi kontrol etmek iyi bir başlangıçtır. \${remainingText}. Aşırı kalori kısıtlamak yerine sürdürülebilir bir açık, yeterli protein, uyku ve düzenli hareketi koru.\`;
+  }
+
+  if (/(akşam|aksam).*(yemek|ne yemel|öğün|ogun)|akşam yemeğinde|aksam yemeginde/.test(text)) {
+    return \`Akşam için sebze + yağsız/az yağlı protein + kontrollü bir karbonhidrat kombinasyonu iyi bir seçenek olabilir: örneğin tavuk veya yoğurt yanında bol salata ve küçük bir bulgur/patates porsiyonu. \${remaining !== null ? \`Bugünkü yaklaşık \${remaining} kcal kalan bütçene göre porsiyonu ayarlayabilirsin.\` : 'Porsiyonu açlık ve günlük hedefine göre ayarla.'}\`;
+  }
+
+  if (/(protein|proteini).*(hedef|tamam|tamamla|eksik)|hedef.*protein|protein.*nasıl/.test(text)) {
+    return 'Protein hedefini tamamlamak için gün içine yayılmış yoğurt/kefir, yumurta, tavuk/hindi, balık, baklagiller veya uygun bir protein ürünü seçebilirsin. Tek öğünde yüklenmek yerine kalan ihtiyacı 1-2 öğüne bölmek daha sürdürülebilir olur.';
+  }
+
+  if (/(su|sıvı|sivi|hidrasyon|litre|ml)/.test(text)) {
+    if (waterRemaining > 0) return \`Bugünkü su tüketimin hedefinin yaklaşık \${waterRemaining} ml altında. Bunu tek seferde içmek yerine gün içine bölerek tamamlamaya çalış.\`;
+    return 'Bugünkü su hedefin dolmuş görünüyor. Gün boyunca susama durumuna göre düzenli içmeye devam et.';
+  }
+
+  if (/(kalori|kcal).*(kaç|kac|hesap|kalan|hedef)|kaç kalori|kac kalori/.test(text)) {
+    if (remaining !== null) return \`Bugünkü hedefin \${target} kcal ve kayıtlı tüketimin \${consumed} kcal; yaklaşık \${remaining} kcal kaldı. Bu değer kayıtlı öğünlere dayanır, porsiyon kayıtlarının doğruluğu sonucu etkiler.\`;
+    return 'Kalori hedefini hesaplamak için yaş, boy, kilo, aktivite düzeyi ve hedef gibi bilgileri kullanmak gerekir. Kayıtlı hedefin varsa günlük tüketimini onunla karşılaştırabilirsin.';
+  }
+
+  if (/(kahvaltı|kahvalti|sabah)/.test(text)) {
+    return 'Dengeli bir kahvaltı için protein + lif + kontrollü karbonhidrat iyi bir temel: örneğin yumurta ve yoğurt yanında sebze ve tam tahıllı küçük bir porsiyon. Açlık durumuna göre miktarı ayarla.';
+  }
+
+  if (/(tatlı|tatli|şeker|seker|abur cubur|atıştır|atistir)/.test(text)) {
+    return 'Tatlı isteğinde önce porsiyonu küçültmek ve öğüne protein/lif eklemek yardımcı olabilir. Meyve + yoğurt gibi daha doyurucu bir alternatif deneyebilir, tatlıyı tamamen yasaklamak yerine planlı küçük porsiyon tercih edebilirsin.';
+  }
+
+  if (/(spor|egzersiz|yürüyüş|yuruyus|antrenman|hareket)/.test(text)) {
+    return 'Kilo yönetiminde düzenli hareket önemli. Başlangıç için günlük yürüyüş ve haftada birkaç gün kuvvet egzersizi iyi bir temel olabilir; mevcut kondisyonuna göre kademeli artır ve ağrı/rahatsızlık varsa zorlamadan profesyonel destek al.';
+  }
+
+  const context = remaining !== null ? \`Bugün yaklaşık \${remaining} kcal alanın kaldı.\` : 'Günlük kalori hedefin kayıtlı değil.';
+  return \`Sorunu anladım: “\${message.slice(0, 140)}”. Bu konuda en güvenli başlangıç, günlük kayıtlarını ve hedeflerini birlikte değerlendirmek. \${context} Su tüketimini ve öğün kayıtlarını da güncel tutarsan daha anlamlı bir değerlendirme yapılabilir.\`;
+}
+`;
 
 if (!source.includes(anchor)) throw new Error('Free AI policy anchor not found: hasOpenAI');
 source = source.replace(anchor, replacement);
@@ -41,4 +128,4 @@ if (!source.includes(coachThrow)) throw new Error('Free AI policy anchor not fou
 source = source.replace(coachThrow, coachThrowReplacement);
 
 fs.writeFileSync(file, source, 'utf8');
-console.log('Production zero-cost AI policy applied: paid OpenAI disabled; Gemini enabled only with USE_GEMINI_FREE_TIER=true; local fallbacks active.');
+console.log('Production zero-cost AI policy applied: paid OpenAI disabled; Gemini enabled only with USE_GEMINI_FREE_TIER=true; intent-aware local fallbacks active.');
