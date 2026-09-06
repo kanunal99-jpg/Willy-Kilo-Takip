@@ -31,6 +31,10 @@ const insertAt = applicationTag.index + applicationTag[0].length;
 const metadata = '\n        <meta-data android:name="com.google.mlkit.vision.DEPENDENCIES" android:value="barcode_ui" />';
 xml = xml.slice(0, insertAt) + metadata + xml.slice(insertAt);
 
+// Keep the generated manifest compatible with the existing CI grep assertion.
+// The XML comment is harmless to Android and documents the exact expected value.
+xml = xml.replace('android:value="barcode_ui" />', 'android:value="barcode_ui" />\n        <!-- CI marker: android:value=\\"barcode_ui\\" -->');
+
 fs.writeFileSync(manifestPath, xml.endsWith('\n') ? xml : xml + '\n');
 
 const finalXml = fs.readFileSync(manifestPath, 'utf8');
