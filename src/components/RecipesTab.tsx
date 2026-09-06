@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Utensils, Clock, Flame, ChefHat, Sparkles, Check, Search, Plus, Filter, X, ArrowRight } from 'lucide-react';
 import { MealFoodEntry, MealType, Recipe } from '../types';
+import { NON_ALCOHOLIC_RECIPES } from '../data/nonAlcoholicRecipes';
 
 interface RecipesTabProps {
   recipes: Recipe[];
@@ -33,10 +34,15 @@ export const RecipesTab: React.FC<RecipesTabProps> = ({
     'Proteinden Zengin',
     'Çabuk Hazırlanan',
     'Tatlı',
+    'Alkolsüz',
   ];
 
+  // The alcohol-free catalog is isolated from the existing recipe source.
+  // This keeps the current AI recipe flow and existing catalog untouched.
+  const sourceRecipes = selectedCategory === 'Alkolsüz' ? NON_ALCOHOLIC_RECIPES : recipes;
+
   // Filter recipes
-  const filtered = recipes.filter((r) => {
+  const filtered = sourceRecipes.filter((r) => {
     const matchesSearch =
       r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       r.tags.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -171,6 +177,12 @@ export const RecipesTab: React.FC<RecipesTabProps> = ({
         ))}
       </div>
 
+      {selectedCategory === 'Alkolsüz' && (
+        <div className="px-3 py-2.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-200">
+          <span className="font-bold text-emerald-400">Alkolsüz Tarifler:</span> Bu özel katalogdaki tariflerde alkollü malzeme kullanılmaz.
+        </div>
+      )}
+
       {/* Calorie Filter Slider */}
       <div className="p-3 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-center justify-between gap-4 text-xs">
         <div className="flex items-center gap-2">
@@ -213,6 +225,11 @@ export const RecipesTab: React.FC<RecipesTabProps> = ({
                 <span className="px-2 py-0.5 rounded-full bg-emerald-500/90 text-slate-950 font-extrabold text-[10px] shadow">
                   PRO (Ücretsiz)
                 </span>
+                {selectedCategory === 'Alkolsüz' && (
+                  <span className="px-2 py-0.5 rounded-full bg-cyan-400/90 text-slate-950 font-extrabold text-[10px] shadow">
+                    ALKOLSÜZ
+                  </span>
+                )}
                 <span className="px-2 py-0.5 rounded-full bg-slate-900/80 backdrop-blur-md text-white font-medium text-[10px] border border-slate-700">
                   {recipe.difficulty}
                 </span>
@@ -265,7 +282,7 @@ export const RecipesTab: React.FC<RecipesTabProps> = ({
               </button>
               <div className="absolute bottom-4 left-5 right-5">
                 <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 text-[10px] font-bold">
-                  PRO Tarif
+                  {activeRecipe.tags.includes('Alkolsüz') ? 'ALKOLSÜZ TARİF' : 'PRO Tarif'}
                 </span>
                 <h3 className="text-xl font-extrabold text-white mt-1">{activeRecipe.title}</h3>
               </div>
