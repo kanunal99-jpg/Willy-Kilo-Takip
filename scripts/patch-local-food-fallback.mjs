@@ -59,13 +59,13 @@ const newRoute = `app.post('/api/ai/analyze-food', async (req, res) => {
     const ai = getGemini();
     if (ai) {
       try {
-        const contents = [];
+        const contents: any[] = [];
         if (imageBase64) contents.push({ inlineData: { mimeType, data: String(imageBase64).replace(/^data:[^;]+;base64,/, '') } });
         contents.push(promptText);
         const response = await ai.models.generateContent({ model: 'gemini-3.6-flash', contents, config: { responseMimeType: 'application/json' } });
         const data = parseAiJson(response.text || '{}');
         return res.json({ success: true, data, provider: 'gemini', model: 'gemini-3.6-flash', fallback: false, analysisMode: 'cloud-ai' });
-      } catch (err) {
+      } catch (err: any) {
         console.error(\`AI Food Gemini failed\\${isGeminiQuotaError(err) ? ' (quota/billing)' : ''}:\`, err?.message || err);
       }
     }
@@ -74,7 +74,7 @@ const newRoute = `app.post('/api/ai/analyze-food', async (req, res) => {
     const fallback = localFoodAnalysisFallback(safeDescription, mealType);
     console.log(\`AI Food local fallback mode=\\${fallback.analysisMode} reason=\\${ai ? 'gemini-unavailable' : 'gemini-not-configured'}\`);
     return res.json({ success: true, data: fallback, provider: 'local', model: 'local-safe-food-fallback-v1', fallback: true, analysisMode: fallback.analysisMode });
-  } catch (err) {
+  } catch (err: any) {
     console.error('AI Food Analysis Error:', err);
     const fallback = localFoodAnalysisFallback('', 'lunch');
     return res.json({ success: true, data: fallback, provider: 'local', model: 'local-safe-food-fallback-v1', fallback: true, analysisMode: fallback.analysisMode });
