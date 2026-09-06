@@ -1,7 +1,7 @@
 {
   "name": "willy-kilo-takip",
   "private": true,
-  "version": "1.0.20",
+  "version": "1.0.21",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
@@ -36,7 +36,7 @@
     "@capacitor/cli": "^7.4.3",
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.3",
-    "tailwindcss": "^4.1.14",
+    "tailwindcss": "~4.1.14",
     "typescript": "~5.8.2"
   }
 }
