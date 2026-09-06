@@ -1,16 +1,15 @@
 {
-  "versionName": "1.0.10",
-  "versionCode": 11,
+  "versionName": "1.0.11",
+  "versionCode": 12,
   "releaseDate": "2026-09-06",
   "minSupportedVersion": "1.0.3",
   "apkUrl": "https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest/download/WillyKiloTakip.apk",
   "githubReleaseUrl": "https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest",
   "releaseNotes": [
-    "Kalıcı kilo geçmişi ve tarih seçimi eklendi",
-    "Kilo geçmişi 7 günle sınırlı değil; tüm kayıtlar korunur",
-    "Gemini kota/ön ödeme tükenirse OpenAI AI fallback otomatik devreye girer",
-    "AI Tara fotoğraf analizi OpenAI görsel girişi ile fallback destekler",
-    "Willy Koç Gemini başarısız olduğunda OpenAI ile devam eder",
+    "Yemek Tarifleri bölümüne Alkolsüz Tarifler filtresi eklendi",
+    "Alkolsüz katalogda 7 hazır tarif ve detayları eklendi",
+    "Alkolsüz tarifler çevrimdışı çalışacak şekilde yerel katalog olarak eklendi",
+    "Mevcut AI Tarif Üret akışı ve tarif kataloğu korunur",
     "Üretim API ve ML Kit barkod kamera desteği korunur"
   ]
 }
