@@ -14,7 +14,8 @@ const forbidden = [
   ['Bitki Çayı', ['fıstık ezmesi','muz','mango']],
   ['Detoks', ['bal','protein tozu','süt','yoğurt']],
   ['Komposto', ['süt','yoğurt','protein tozu']],
-  ['Şerbet', ['süt','yoğurt','protein tozu']]
+  ['Şerbet', ['süt','yoğurt','protein tozu']],
+  ['Yöresel İçecekler', ['votka','rom','viski','şarap','bira']]
 ];
 
 try {
@@ -30,23 +31,25 @@ try {
   const volumes = new Set();
 
   for (const r of catalog) {
+    const category = r?.cat ?? r?.category;
     if (!r?.id || ids.has(r.id)) throw new Error(`DUPLICATE_ID:${r?.id}`);
     ids.add(r.id);
-    if (!r.category || !r.ingredients?.length || r.ingredients.length < 2) throw new Error(`RECIPE_STRUCTURE:${r?.id}`);
+    if (!category || !r.ingredients?.length || r.ingredients.length < 2) throw new Error(`RECIPE_STRUCTURE:${r?.id}`);
     if (!Array.isArray(r.steps) || r.steps.length < 3) throw new Error(`STEPS:${r?.id}`);
     if (!Number.isFinite(r.volumeMl) || r.volumeMl < 100 || r.volumeMl > 3000) throw new Error(`VOLUME:${r?.id}`);
     if (!Number.isFinite(r.nutrition?.calories) || !Number.isFinite(r.nutrition?.protein) || !Number.isFinite(r.nutrition?.carbs) || !Number.isFinite(r.nutrition?.fat)) throw new Error(`NUTRITION:${r?.id}`);
-    const text = `${r.category} ${r.title ?? ''} ${(r.ingredients ?? []).map(x => `${x.key} ${x.name}`).join(' ')}`.toLocaleLowerCase('tr-TR');
+    const text = `${category} ${r.title ?? ''} ${(r.ingredients ?? []).map(x => `${x.key ?? ''} ${x.name ?? ''} ${x.amount ?? x.grams ?? ''}`).join(' ')}`.toLocaleLowerCase('tr-TR');
     const hit = alcohol.find(x => text.includes(x));
     if (hit) throw new Error(`ALCOHOL:${r?.id}:${hit}`);
-    const rule = forbidden.find(([cat]) => cat === r.category);
+    const rule = forbidden.find(([cat]) => cat === category);
     if (rule) {
-      for (const term of rule[1]) if (text.includes(term)) throw new Error(`COMPATIBILITY:${r?.id}:${r.category}:${term}`);
+      for (const term of rule[1]) if (text.includes(term)) throw new Error(`COMPATIBILITY:${r?.id}:${category}:${term}`);
     }
-    categories.add(r.category);
+    categories.add(category);
     if (r.variant) variants.add(r.variant);
     volumes.add(r.volumeMl);
-    const sig = `${r.category}|${r.variant}|${r.volumeMl}|${(r.ingredients ?? []).map(x => `${x.key}:${x.grams}`).sort().join(',')}`;
+    const ingredientSignature = (r.ingredients ?? []).map(x => `${x.key ?? x.name ?? ''}:${x.grams ?? x.amount ?? ''}`).sort().join(',');
+    const sig = `${category}|${r.variant}|${r.volumeMl}|${ingredientSignature}`;
     if (signatures.has(sig)) throw new Error(`DUPLICATE_RECIPE_SIGNATURE:${r?.id}`);
     signatures.add(sig);
   }
