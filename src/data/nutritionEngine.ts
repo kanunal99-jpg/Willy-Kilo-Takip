@@ -1,16 +1,16 @@
-import { NUTRITION_SOURCES, USDA } from './nutritionSources';
+import { NUTRITION_SOURCES } from './nutritionSources';
 
 export type RecipeIngredient = { key: string; name: string; amount?: number; unit?: string; grams?: number };
 export type NutritionInput = { key: string; grams: number };
 
 type NutritionEntry = {
   key: string; name: string; kcalPer100g: number; proteinPer100g: number; carbsPer100g: number; fatPer100g: number; fiberPer100g: number;
-  source: string; sourceUrl: string; confidence: 'reference' | 'estimated';
+  source: string; confidence: 'reference' | 'estimated';
 };
 
 const ingredient = (key: string, name: string, kcal: number, protein: number, carbs: number, fat: number, fiber: number): NutritionEntry => ({
   key, name, kcalPer100g: kcal, proteinPer100g: protein, carbsPer100g: carbs, fatPer100g: fat, fiberPer100g: fiber,
-  source: NUTRITION_SOURCES.default, sourceUrl: USDA, confidence: 'reference',
+  source: NUTRITION_SOURCES.default, confidence: 'reference',
 });
 
 export const INGREDIENTS: Record<string, NutritionEntry> = {
@@ -24,25 +24,18 @@ export type NutritionResult = { ingredients: NutritionIngredient[]; calories: nu
 type CompatibleIngredient = RecipeIngredient | NutritionInput;
 function toCanonical(item: CompatibleIngredient): { key: string; name: string; amount: number; unit: string } {
   const fallbackName = INGREDIENTS[item.key]?.name ?? item.key;
-  if ('grams' in item && typeof item.grams === 'number') {
-    return { key: item.key, name: 'name' in item && typeof item.name === 'string' ? item.name : fallbackName, amount: item.grams, unit: 'g' };
-  }
-  if ('amount' in item && typeof item.amount === 'number') {
-    return { key: item.key, name: 'name' in item && typeof item.name === 'string' ? item.name : fallbackName, amount: item.amount, unit: item.unit || 'g' };
-  }
+  if ('grams' in item && typeof item.grams === 'number') return { key: item.key, name: 'name' in item && typeof item.name === 'string' ? item.name : fallbackName, amount: item.grams, unit: 'g' };
+  if ('amount' in item && typeof item.amount === 'number') return { key: item.key, name: 'name' in item && typeof item.name === 'string' ? item.name : fallbackName, amount: item.amount, unit: item.unit || 'g' };
   throw new Error(`Invalid nutrition ingredient amount: ${item.key}`);
 }
 
 export function calculateNutrition(items: CompatibleIngredient[], servings = 1): NutritionResult {
   const normalizedServings = Math.max(1, servings);
-  const mapped: NutritionIngredient[] = items.map((raw) => {
-    const item = toCanonical(raw); const n = INGREDIENTS[item.key]; if (!n) throw new Error(`Nutrition ingredient not found: ${item.key}`); const ratio = item.amount / 100;
-    return { ...n, amount: item.amount, unit: item.unit, source: n.source, confidence: n.confidence === 'reference' ? 1 : 0.7, calories: n.kcalPer100g * ratio };
-  });
+  const mapped: NutritionIngredient[] = items.map((raw) => { const item = toCanonical(raw); const n = INGREDIENTS[item.key]; if (!n) throw new Error(`Nutrition ingredient not found: ${item.key}`); const ratio = item.amount / 100; return { ...n, amount: item.amount, unit: item.unit, source: n.source, confidence: n.confidence === 'reference' ? 1 : 0.7, calories: n.kcalPer100g * ratio }; });
   const totals = mapped.reduce((a, x) => ({ calories: a.calories + x.calories, protein: a.protein + x.proteinPer100g * (x.amount / 100), carbs: a.carbs + x.carbsPer100g * (x.amount / 100), fat: a.fat + x.fatPer100g * (x.amount / 100), fiber: a.fiber + x.fiberPer100g * (x.amount / 100) }), { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 });
   const perServing = { calories: totals.calories / normalizedServings, protein: totals.protein / normalizedServings, carbs: totals.carbs / normalizedServings, fat: totals.fat / normalizedServings, fiber: totals.fiber / normalizedServings };
   const source = mapped.length ? [...new Set(mapped.map((x) => x.source))].join(', ') : NUTRITION_SOURCES.default;
-  const entries: NutritionEntry[] = mapped.map((x) => ({ key: x.key, name: x.name, kcalPer100g: x.kcalPer100g, proteinPer100g: x.proteinPer100g, carbsPer100g: x.carbsPer100g, fatPer100g: x.fatPer100g, fiberPer100g: x.fiberPer100g, source: x.source, sourceUrl: x.sourceUrl, confidence: x.confidence === 1 ? 'reference' : 'estimated' }));
+  const entries: NutritionEntry[] = mapped.map((x) => ({ key: x.key, name: x.name, kcalPer100g: x.kcalPer100g, proteinPer100g: x.proteinPer100g, carbsPer100g: x.carbsPer100g, fatPer100g: x.fatPer100g, fiberPer100g: x.fiberPer100g, source: x.source, confidence: x.confidence === 1 ? 'reference' : 'estimated' }));
   const confidence = mapped.length ? mapped.reduce((sum, x) => sum + x.confidence, 0) / mapped.length : 0;
   return { ingredients: mapped, calories: perServing.calories, kcal: perServing.calories, protein: perServing.protein, carbs: perServing.carbs, fat: perServing.fat, fiber: perServing.fiber, source, confidence, provenance: { source, confidence, entries } };
 }
