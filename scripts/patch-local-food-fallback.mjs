@@ -26,60 +26,54 @@ function localFoodAnalysisFallback(description = '', mealType = 'lunch') {
   if (found) return { ...found, breakdown: [{ item: found.name, calories: found.calories, amount: '1 standart porsiyon' }], confidence: 'medium', analysisMode: 'local-description', note: 'Ücretsiz yerel analiz. Değerler yaklaşık olup porsiyona göre değişebilir.' };
   return {
     name: text ? text.slice(0, 80) : 'Fotoğraftaki yemek',
-    calories: 250,
-    protein: 15,
-    carbs: 28,
-    fat: 9,
-    fiber: 4,
-    healthScore: 80,
+    calories: 250, protein: 15, carbs: 28, fat: 9, fiber: 4, healthScore: 80,
     pros: ['Analiz sonucu güvenli varsayılan olarak oluşturuldu'],
     cons: ['Yemeğin türü ve porsiyonu doğrulanmadı'],
     advice: 'Gemini kotası kullanılamadığı için bu sonuç yaklaşık yerel tahmindir. Yemeğin adını veya porsiyonunu yazarak sonucu netleştirin.',
     breakdown: [{ item: 'Yaklaşık standart öğün', calories: 250, amount: '1 porsiyon' }],
-    confidence: 'low',
-    analysisMode: 'local-safe-default',
+    confidence: 'low', analysisMode: 'local-safe-default',
     note: 'Ücretsiz yerel güvenli varsayılan. Fotoğraf görsel olarak doğrulanamadığı için kesin besin değeri değildir.',
   };
 }
 `;
 
-const marker = "function parseAiJson(text: string): any {";
+const marker = 'function parseAiJson(text: string): any {';
 if (!source.includes(marker)) throw new Error('parseAiJson marker not found');
-source = source.replace(marker, helper + "\n" + marker);
+source = source.replace(marker, helper + '\n' + marker);
 
 const routeStart = source.indexOf("app.post('/api/ai/analyze-food'");
 const routeEnd = source.indexOf("\n\napp.post('/api/ai/coach'", routeStart);
 if (routeStart < 0 || routeEnd < 0) throw new Error('analyze-food route boundaries not found');
 
-const newRoute = `app.post('/api/ai/analyze-food', async (req, res) => {
-  try {
-    const { imageBase64, mimeType = 'image/jpeg', description, mealType = 'lunch' } = req.body || {};
-    const safeDescription = String(description || '').trim().slice(0, 500);
-    const promptText = \\`Sen dünya standartlarında bir AI Beslenme Uzmanı ve Diyetisyensin. Kullanıcı "\\${mealType}" öğünü için bir yemek fotoğrafı veya açıklaması gönderdi. \\${safeDescription ? \\`Kullanıcı notu: "\\${safeDescription}".\\` : ''}\\n\\nYemeği detaylıca analiz et ve sadece geçerli JSON nesnesi olarak yanıt ver.\\nFormat: {"name":"Yemeğin Türkçe adı","calories":420,"protein":32,"carbs":35,"fat":16,"fiber":6,"healthScore":90,"pros":["İyi protein kaynağı"],"cons":["Orta sodyum"],"advice":"1-2 cümlelik kişisel tavsiye","breakdown":[{"item":"Malzeme","calories":250,"amount":"150g"}]}\\`;
-    const ai = getGemini();
-    if (ai) {
-      try {
-        const contents: any[] = [];
-        if (imageBase64) contents.push({ inlineData: { mimeType, data: String(imageBase64).replace(/^data:[^;]+;base64,/, '') } });
-        contents.push(promptText);
-        const response = await ai.models.generateContent({ model: 'gemini-3.6-flash', contents, config: { responseMimeType: 'application/json' } });
-        const data = parseAiJson(response.text || '{}');
-        return res.json({ success: true, data, provider: 'gemini', model: 'gemini-3.6-flash', fallback: false, analysisMode: 'cloud-ai' });
-      } catch (err: any) {
-        console.error(\`AI Food Gemini failed\\${isGeminiQuotaError(err) ? ' (quota/billing)' : ''}:\`, err?.message || err);
-      }
-    }
-
-    // Zero-cost policy: never require a paid provider. Gemini failure is converted into a truthful local result.
-    const fallback = localFoodAnalysisFallback(safeDescription, mealType);
-    console.log(\`AI Food local fallback mode=\\${fallback.analysisMode} reason=\\${ai ? 'gemini-unavailable' : 'gemini-not-configured'}\`);
-    return res.json({ success: true, data: fallback, provider: 'local', model: 'local-safe-food-fallback-v1', fallback: true, analysisMode: fallback.analysisMode });
-  } catch (err: any) {
-    console.error('AI Food Analysis Error:', err);
-    const fallback = localFoodAnalysisFallback('', 'lunch');
-    return res.json({ success: true, data: fallback, provider: 'local', model: 'local-safe-food-fallback-v1', fallback: true, analysisMode: fallback.analysisMode });
-  }
-});`;
+const newRoute = [
+  "app.post('/api/ai/analyze-food', async (req, res) => {",
+  '  try {',
+  "    const { imageBase64, mimeType = 'image/jpeg', description, mealType = 'lunch' } = req.body || {};",
+  "    const safeDescription = String(description || '').trim().slice(0, 500);",
+  "    const promptText = 'Sen dünya standartlarında bir AI Beslenme Uzmanı ve Diyetisyensin. Kullanıcı ' + mealType + ' öğünü için bir yemek fotoğrafı veya açıklaması gönderdi. ' + (safeDescription ? 'Kullanıcı notu: ' + JSON.stringify(safeDescription) + '.' : '') + '\\n\\nYemeği detaylıca analiz et ve sadece geçerli JSON nesnesi olarak yanıt ver. Format: {name, calories, protein, carbs, fat, fiber, healthScore, pros, cons, advice, breakdown}';",
+  '    const ai = getGemini();',
+  '    if (ai) {',
+  '      try {',
+  '        const contents: any[] = [];',
+  "        if (imageBase64) contents.push({ inlineData: { mimeType, data: String(imageBase64).replace(/^data:[^;]+;base64,/, '') } });",
+  '        contents.push(promptText);',
+  "        const response = await ai.models.generateContent({ model: 'gemini-3.6-flash', contents, config: { responseMimeType: 'application/json' } });",
+  "        const data = parseAiJson(response.text || '{}');",
+  "        return res.json({ success: true, data, provider: 'gemini', model: 'gemini-3.6-flash', fallback: false, analysisMode: 'cloud-ai', visualAnalyzed: Boolean(imageBase64) });",
+  '      } catch (err: any) {',
+  "        console.error('AI Food Gemini failed' + (isGeminiQuotaError(err) ? ' (quota/billing)' : '') + ':', err?.message || err);",
+  '      }',
+  '    }',
+  '    const fallback = localFoodAnalysisFallback(safeDescription, mealType);',
+  "    console.log('AI Food local fallback mode=' + fallback.analysisMode + ' reason=' + (ai ? 'gemini-unavailable' : 'gemini-not-configured'));",
+  "    return res.status(200).json({ success: true, data: fallback, provider: 'local', model: 'local-safe-food-fallback-v1', fallback: true, analysisMode: fallback.analysisMode, visualAnalyzed: false, warning: 'Fotoğraf görsel olarak doğrulanamadı; sonuç metin/porsiyon bilgisi yoksa yaklaşık tahmindir.' });",
+  '  } catch (err: any) {',
+  "    console.error('AI Food Analysis Error:', err);",
+  "    const fallback = localFoodAnalysisFallback('', 'lunch');",
+  "    return res.status(200).json({ success: true, data: fallback, provider: 'local', model: 'local-safe-food-fallback-v1', fallback: true, analysisMode: fallback.analysisMode, visualAnalyzed: false, warning: 'Görsel analiz başarısız; sonuç kesin besin değeri değildir.' });",
+  '  }',
+  '});'
+].join('\n');
 
 source = source.slice(0, routeStart) + newRoute + source.slice(routeEnd);
 fs.writeFileSync(file, source, 'utf8');
