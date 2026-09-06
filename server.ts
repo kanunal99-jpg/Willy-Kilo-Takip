@@ -7,7 +7,6 @@ import { createServer as createViteServer } from 'vite';
 const app = express();
 const PORT = process.env.RENDER ? (Number(process.env.PORT) || 10000) : (process.env.NODE_ENV === 'production' && process.env.PORT && process.env.PORT !== '8080' ? Number(process.env.PORT) : 3000);
 
-// Capacitor Android runs from a native localhost origin and calls the Render API cross-origin.
 app.use((req, res, next) => {
   const origin = req.headers.origin || '';
   if (origin === 'capacitor://' || origin === 'http://localhost' || origin === 'https://localhost' || origin.startsWith('capacitor://') || origin.startsWith('http://localhost') || origin.startsWith('https://localhost')) {
@@ -23,7 +22,7 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
-const DATA_DIR = path.join(process.cwd(), 'data');
+const DATA_DIR = process.env.WILLY_DATA_DIR?.trim() || path.join(process.cwd(), 'data');
 const SYNC_FILE = path.join(DATA_DIR, 'cloud_sync_db.json');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
@@ -49,7 +48,6 @@ function loadCloudDb(): CloudDb {
 
 function saveCloudDb(data: CloudDb) {
   try {
-    // Atomic replace prevents a concurrent write or process interruption from corrupting the JSON database.
     const tempFile = `${SYNC_FILE}.tmp`;
     fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), 'utf-8');
     fs.renameSync(tempFile, SYNC_FILE);
@@ -59,8 +57,6 @@ function saveCloudDb(data: CloudDb) {
   }
 }
 
-// Sync keys are the only credential in this lightweight sync architecture. Existing 6-digit keys remain
-// compatible, while new profiles use 128-bit random keys. Rate limiting prevents practical brute-force abuse.
 type RateEntry = { windowStart: number; count: number };
 const syncRateByIp = new Map<string, RateEntry>();
 const syncInvalidByIp = new Map<string, RateEntry>();
@@ -87,7 +83,6 @@ function allowRate(map: Map<string, RateEntry>, ip: string, max: number): boolea
 }
 
 function syncKeyLooksValid(key: string): boolean {
-  // Supports legacy WILLY-123456 keys and new WILLY- + 32 hex-character keys.
   return /^WILLY-(?:\d{6}|[A-F0-9]{32})$/i.test(key);
 }
 
@@ -140,10 +135,7 @@ async function callOpenAI(prompt: string, imageBase64?: string, mimeType = 'imag
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: process.env.OPENAI_MODEL?.trim() || 'gpt-5.6-luna',
-      input: [{ role: 'user', content }],
-    }),
+    body: JSON.stringify({ model: process.env.OPENAI_MODEL?.trim() || 'gpt-5.6-luna', input: [{ role: 'user', content }] }),
   });
   const data: any = await response.json();
   if (!response.ok) throw new Error(data?.error?.message || `OpenAI HTTP ${response.status}`);
@@ -170,13 +162,7 @@ let cachedRelease: { timestamp: number; data: any } | null = null;
 
 app.get(['/api/app-version', '/api/app-version/manifest.json'], async (req, res) => {
   try {
-    let localVersion = {
-      versionName: '1.0.1', versionCode: 2, releaseDate: '2026-09-05', minSupportedVersion: '1.0.0',
-      apkUrl: 'https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest/download/WillyKiloTakip.apk',
-      githubReleaseUrl: 'https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest',
-      releaseNotes: ['Gerçek Gemini AI Willy Koç ve Fotoğraflı Yemek Analizi aktif', 'Canlı OTA Güncelleme Sistemi aktif', 'Otomatik GitHub Actions Release ve APK dağıtımı', 'PWA ve Offline-First yerel veri koruma mimarisi'],
-      mandatory: false,
-    };
+    let localVersion = { versionName: '1.0.1', versionCode: 2, releaseDate: '2026-09-05', minSupportedVersion: '1.0.0', apkUrl: 'https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest/download/WillyKiloTakip.apk', githubReleaseUrl: 'https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest', releaseNotes: ['Gerçek Gemini AI Willy Koç ve Fotoğraflı Yemek Analizi aktif', 'Canlı OTA Güncelleme Sistemi aktif', 'Otomatik GitHub Actions Release ve APK dağıtımı', 'PWA ve Offline-First yerel veri koruma mimarisi'], mandatory: false };
     if (fs.existsSync(VERSION_FILE)) {
       try { localVersion = JSON.parse(fs.readFileSync(VERSION_FILE, 'utf-8')); } catch (e) { console.error('Error reading version.json:', e); }
     }
@@ -195,28 +181,16 @@ app.get(['/api/app-version', '/api/app-version/manifest.json'], async (req, res)
           const ghJson: any = await ghRes.json();
           if (ghJson?.tag_name) {
             const apkAsset = Array.isArray(ghJson.assets) ? ghJson.assets.find((a: any) => a.name?.endsWith('.apk')) : null;
-            latestGithubData = {
-              versionName: ghJson.tag_name.replace(/^v/, ''), versionCode: localVersion.versionCode,
-              releaseDate: ghJson.published_at ? ghJson.published_at.split('T')[0] : localVersion.releaseDate,
-              releaseNotes: ghJson.body ? ghJson.body.split('\n').filter((l: string) => l.trim()) : localVersion.releaseNotes,
-              apkUrl: apkAsset ? apkAsset.browser_download_url : localVersion.apkUrl,
-              githubReleaseUrl: ghJson.html_url || localVersion.githubReleaseUrl,
-            };
+            latestGithubData = { versionName: ghJson.tag_name.replace(/^v/, ''), versionCode: localVersion.versionCode, releaseDate: ghJson.published_at ? ghJson.published_at.split('T')[0] : localVersion.releaseDate, releaseNotes: ghJson.body ? ghJson.body.split('\n').filter((l: string) => l.trim()) : localVersion.releaseNotes, apkUrl: apkAsset ? apkAsset.browser_download_url : localVersion.apkUrl, githubReleaseUrl: ghJson.html_url || localVersion.githubReleaseUrl };
             cachedRelease = { timestamp: now, data: latestGithubData };
           }
         }
       } catch (_) {}
     }
     const effective = latestGithubData || localVersion;
-    const hasUpdate = currentCodeQuery > 0 && effective.versionCode
-      ? effective.versionCode > currentCodeQuery
-      : currentVersionQuery
-        ? String(effective.versionName).replace(/^v/, '').trim() !== currentVersionQuery.replace(/^v/, '').trim()
-        : false;
+    const hasUpdate = currentCodeQuery > 0 && effective.versionCode ? effective.versionCode > currentCodeQuery : currentVersionQuery ? String(effective.versionName).replace(/^v/, '').trim() !== currentVersionQuery.replace(/^v/, '').trim() : false;
     res.json({ success: true, versionName: effective.versionName, versionCode: effective.versionCode || localVersion.versionCode, releaseDate: effective.releaseDate, releaseNotes: effective.releaseNotes, apkUrl: effective.apkUrl, githubReleaseUrl: effective.githubReleaseUrl, mandatory: false, hasUpdate, clientVersion: currentVersionQuery || undefined, checkedAt: new Date().toISOString() });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
-  }
+  } catch (err: any) { res.status(500).json({ success: false, error: err.message }); }
 });
 
 app.get('/api/sync/:userId', (req, res) => {
@@ -233,15 +207,9 @@ app.post('/api/sync/:userId', (req, res) => {
   if (!userId) return;
   try {
     const { profile, dailyLogs, fastingHistory, weightRecords, customRecipes } = req.body || {};
-    if (!profile || typeof profile !== 'object' || !Array.isArray(fastingHistory) || !Array.isArray(weightRecords) || typeof dailyLogs !== 'object') {
-      return res.status(400).json({ success: false, error: 'Geçersiz senkronizasyon verisi.', code: 'INVALID_SYNC_PAYLOAD' });
-    }
+    if (!profile || typeof profile !== 'object' || !Array.isArray(fastingHistory) || !Array.isArray(weightRecords) || typeof dailyLogs !== 'object') return res.status(400).json({ success: false, error: 'Geçersiz senkronizasyon verisi.', code: 'INVALID_SYNC_PAYLOAD' });
     const db = loadCloudDb();
-    db[userId] = {
-      lastUpdated: Date.now(), profile,
-      dailyLogs, fastingHistory, weightRecords,
-      customRecipes: Array.isArray(customRecipes) ? customRecipes : db[userId]?.customRecipes || [],
-    };
+    db[userId] = { lastUpdated: Date.now(), profile, dailyLogs, fastingHistory, weightRecords, customRecipes: Array.isArray(customRecipes) ? customRecipes : db[userId]?.customRecipes || [] };
     saveCloudDb(db);
     res.json({ success: true, timestamp: db[userId].lastUpdated, message: 'Bulut senkronizasyonu başarıyla tamamlandı.' });
   } catch (error: any) {
@@ -252,67 +220,101 @@ app.post('/api/sync/:userId', (req, res) => {
 
 app.post('/api/ai/analyze-food', async (req, res) => {
   try {
-    const { imageBase64, mimeType = 'image/jpeg', description, mealType = 'lunch' } = req.body;
-    const promptText = `Sen dünya standartlarında bir AI Beslenme Uzmanı ve Diyetisyensin. Kullanıcı "${mealType}" öğünü için bir yemek fotoğrafı veya açıklaması gönderdi. ${description ? `Kullanıcı notu: "${description}".` : ''}\n\nYemeği detaylıca analiz et ve sadece geçerli JSON nesnesi olarak yanıt ver.\nFormat: {"name":"Yemeğin Türkçe adı","calories":420,"protein":32,"carbs":35,"fat":16,"fiber":6,"healthScore":90,"pros":["İyi protein kaynağı"],"cons":["Orta sodyum"],"advice":"1-2 cümlelik kişisel tavsiye","breakdown":[{"item":"Malzeme","calories":250,"amount":"150g"}]}`;
+    const { imageBase64, mimeType = 'image/jpeg', description, mealType = 'lunch' } = req.body || {};
+    const safeDescription = String(description || '').trim().slice(0, 500);
+    const promptText = 'Sen dünya standartlarında bir AI Beslenme Uzmanı ve Diyetisyensin. Kullanıcı ' + mealType + ' öğünü için bir yemek fotoğrafı veya açıklaması gönderdi. ' + (safeDescription ? 'Kullanıcı notu: ' + JSON.stringify(safeDescription) + '.' : '') + '\n\nYemeği detaylıca analiz et ve sadece geçerli JSON nesnesi olarak yanıt ver. Format: {name, calories, protein, carbs, fat, fiber, healthScore, pros, cons, advice, breakdown}';
     const ai = getGemini();
     if (ai) {
       try {
         const contents: any[] = [];
-        if (imageBase64) contents.push({ inlineData: { mimeType, data: imageBase64.replace(/^data:image\/\w+;base64,/, '') } });
+        if (imageBase64) contents.push({ inlineData: { mimeType, data: String(imageBase64).replace(/^data:[^;]+;base64,/, '') } });
         contents.push(promptText);
         const response = await ai.models.generateContent({ model: 'gemini-3.6-flash', contents, config: { responseMimeType: 'application/json' } });
-        return res.json({ success: true, data: parseAiJson(response.text || '{}'), provider: 'gemini', model: 'gemini-3.6-flash' });
-      } catch (err: any) {
-        console.error(`AI Food Gemini failed${isGeminiQuotaError(err) ? ' (quota/billing)' : ''}:`, err?.message || err);
-        if (!hasOpenAI()) throw err;
-      }
+        const data = parseAiJson(response.text || '{}');
+        return res.json({ success: true, data, provider: 'gemini', model: 'gemini-3.6-flash', fallback: false, analysisMode: 'cloud-ai', visualAnalyzed: Boolean(imageBase64) });
+      } catch (err: any) { console.error('AI Food Gemini failed' + (isGeminiQuotaError(err) ? ' (quota/billing)' : '') + ':', err?.message || err); }
     }
-    if (!hasOpenAI()) return res.status(503).json({ success: false, error: 'AI sağlayıcısı yapılandırılmamış.', code: 'AI_NOT_CONFIGURED' });
-    const openAiText = await callOpenAI(promptText, imageBase64, mimeType);
-    return res.json({ success: true, data: parseAiJson(openAiText), provider: 'openai', model: process.env.OPENAI_MODEL?.trim() || 'gpt-5.6-luna', fallback: true });
+    const fallback = localFoodAnalysisFallback(safeDescription, mealType);
+    return res.status(200).json({ success: true, data: fallback, provider: 'local', model: 'local-safe-food-fallback-v1', fallback: true, analysisMode: fallback.analysisMode, visualAnalyzed: false, warning: 'Fotoğraf görsel olarak doğrulanamadı; sonuç metin/porsiyon bilgisi yoksa yaklaşık tahmindir.' });
   } catch (err: any) {
     console.error('AI Food Analysis Error:', err);
-    return res.status(502).json({ success: false, error: 'AI yemek analizi başarısız: ' + (err.message || 'Bilinmeyen hata'), code: 'AI_REQUEST_FAILED' });
+    const fallback = localFoodAnalysisFallback('', 'lunch');
+    return res.status(200).json({ success: true, data: fallback, provider: 'local', model: 'local-safe-food-fallback-v1', fallback: true, analysisMode: fallback.analysisMode, visualAnalyzed: false, warning: 'Görsel analiz başarısız; sonuç kesin besin değeri değildir.' });
   }
 });
 
 app.post('/api/ai/coach', async (req, res) => {
   const startedAt = Date.now();
   try {
-    const { message, userProfile, todaySummary } = req.body || {};
-    const userMessage = String(message || '').trim() || 'Bugünkü ilerlememi ve bana tavsiyelerini söyler misin?';
-    const systemPrompt = `Sen "Willy Kilo Takip" uygulamasının sevimli, sempatik, bilimsel ve motive edici yapay zeka koçu Willy'sin.\nKullanıcının verileri:\n- Hedef: ${userProfile?.goal === 'lose_weight' ? 'Kilo Vermek' : 'Kilo Korumak / Kas Kazanmak'}\n- Güncel Kilo: ${userProfile?.currentWeightKg ?? 'bilinmiyor'} kg, Hedef: ${userProfile?.targetWeightKg ?? 'bilinmiyor'} kg\n- Günlük Kalori Hedefi: ${userProfile?.dailyCalorieTarget ?? 'bilinmiyor'} kcal\n- Bugün Alınan: ${todaySummary?.consumedCalories || 0} kcal, Yakılan: ${todaySummary?.burnedCalories || 0} kcal\n- Bugün Su: ${(todaySummary?.waterMl || 0) / 1000} L (Hedef: ${(userProfile?.waterTargetMl || 2000) / 1000} L)\n- Aralıklı Oruç: ${todaySummary?.fastingActive ? 'aktif' : 'aktif değil'}\n\nKURALLAR:\n1. Kullanıcının yazdığı soruya doğrudan cevap ver; soruyu yok sayma.\n2. Her soruya aynı cevabı verme. Konuya göre öneri üret.\n3. Kullanıcının mevcut verilerini gerektiğinde cevaba bağla.\n4. Kilo verme konusunda aşırı kısıtlayıcı veya tıbben riskli öneriler verme.\n5. Yanıtı Türkçe, doğal, kısa ama uygulanabilir ver. Gerektiğinde maddeler kullan.\n6. Tanı koyma; ciddi sağlık durumlarında doktora yönlendir.\n\nKullanıcı sorusu: ${userMessage}`;
-
+    const { message: userMessage, userProfile, todaySummary } = req.body || {};
+    const safeMessage = String(userMessage || '').trim().slice(0, 1000);
+    if (!safeMessage) return res.status(400).json({ success: false, error: 'Mesaj boş olamaz.', code: 'INVALID_AI_MESSAGE' });
+    const systemPrompt = `Sen Willy Kilo Takip uygulamasının kişisel beslenme koçusun. Kullanıcının profil ve günlük özetine göre Türkçe, pratik ve sürdürülebilir öneriler ver. Tıbbi tanı koyma. Profil: ${JSON.stringify(userProfile || {})}. Bugün: ${JSON.stringify(todaySummary || {})}. Kullanıcı: ${JSON.stringify(safeMessage)}`;
     const ai = getGemini();
+    let lastError: any = null;
     if (ai) {
-      const models = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash'];
-      let lastError: any = null;
-      for (const model of models) {
+      for (const model of ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash']) {
         try {
           const response = await ai.models.generateContent({ model, contents: systemPrompt });
-          const reply = response.text?.trim();
-          if (reply) {
-            console.log(`AI Coach success provider=gemini model=${model} durationMs=${Date.now() - startedAt}`);
-            return res.json({ success: true, reply, model, provider: 'gemini' });
-          }
+          const reply = String(response.text || '').trim();
+          if (!reply) throw new Error('Gemini boş yanıt döndürdü.');
+          console.log(`AI Coach success provider=gemini model=${model} durationMs=${Date.now() - startedAt}`);
+          return res.json({ success: true, reply, model, provider: 'gemini', fallback: false });
         } catch (err: any) {
           lastError = err;
           console.error(`AI Coach Gemini model=${model} failed${isGeminiQuotaError(err) ? ' (quota/billing)' : ''}:`, err?.message || err);
           if (isGeminiQuotaError(err)) break;
         }
       }
-      if (!hasOpenAI() && lastError) throw lastError;
     }
-
-    if (!hasOpenAI()) return res.status(503).json({ success: false, error: 'AI sağlayıcısı yapılandırılmamış.', code: 'AI_NOT_CONFIGURED' });
-    const reply = await callOpenAI(systemPrompt);
-    console.log(`AI Coach success provider=openai model=${process.env.OPENAI_MODEL?.trim() || 'gpt-5.6-luna'} durationMs=${Date.now() - startedAt}`);
-    return res.json({ success: true, reply, model: process.env.OPENAI_MODEL?.trim() || 'gpt-5.6-luna', provider: 'openai', fallback: true });
+    const reply = localCoachFallback(userProfile, todaySummary, safeMessage);
+    console.log(`AI Coach local fallback durationMs=${Date.now() - startedAt} reason=${lastError ? 'gemini-failed' : 'gemini-not-configured'}`);
+    return res.json({ success: true, reply, provider: 'local', model: 'deterministic-free-fallback', fallback: true, warning: lastError ? 'Gemini kullanılamadı; ücretsiz yerel koç devrede.' : 'Gemini yapılandırılmadı; ücretsiz yerel koç devrede.' });
   } catch (err: any) {
     console.error('AI Coach Error:', err);
-    return res.status(502).json({ success: false, error: 'AI koç isteği işlenemedi: ' + (err.message || 'Bilinmeyen hata'), code: 'AI_REQUEST_FAILED' });
+    try { return res.json({ success: true, reply: localCoachFallback(req.body?.userProfile, req.body?.todaySummary, String(req.body?.message || '')), provider: 'local', model: 'deterministic-free-fallback', fallback: true, warning: 'AI isteği yerel güvenli moda alındı.' }); }
+    catch (_) { return res.status(500).json({ success: false, error: 'AI koç isteği işlenemedi.', code: 'AI_REQUEST_FAILED' }); }
   }
 });
+
+function localFoodAnalysisFallback(description = '', mealType = 'lunch') {
+  const text = String(description || '').toLocaleLowerCase('tr-TR');
+  const entries = [
+    { keys: ['yumurta', 'omlet'], name: 'Yumurta / Omlet', calories: 180, protein: 13, carbs: 2, fat: 13, fiber: 0, healthScore: 88, pros: ['İyi protein kaynağı'], cons: ['Porsiyona göre yağ miktarı değişebilir'], advice: 'Pişirme yağını ve eklenen malzemeleri ayrıca hesaba katın.' },
+    { keys: ['tavuk', 'ızgara tavuk', 'tavuk göğsü'], name: 'Tavuk Göğsü', calories: 250, protein: 46, carbs: 0, fat: 6, fiber: 0, healthScore: 92, pros: ['Yüksek protein'], cons: ['Porsiyon büyüdükçe kalori artar'], advice: 'Yanına sebze ekleyerek öğünü dengeli tutabilirsiniz.' },
+    { keys: ['pilav', 'pirinç'], name: 'Pirinç Pilavı', calories: 260, protein: 5, carbs: 50, fat: 5, fiber: 1, healthScore: 74, pros: ['Enerji sağlar'], cons: ['Karbonhidrat yoğun'], advice: 'Porsiyonu ölçerek protein ve sebze ile dengeleyin.' },
+    { keys: ['makarna'], name: 'Makarna', calories: 300, protein: 10, carbs: 55, fat: 6, fiber: 3, healthScore: 76, pros: ['Pratik enerji kaynağı'], cons: ['Sos ve yağ kaloriyi yükseltebilir'], advice: 'Sos ve yağ miktarını kontrol edin; yanına protein ve sebze ekleyin.' },
+    { keys: ['mercimek çorba', 'mercimek corba', 'mercimek'], name: 'Mercimek Çorbası', calories: 180, protein: 9, carbs: 27, fat: 5, fiber: 7, healthScore: 90, pros: ['Lif ve bitkisel protein içerir'], cons: ['Ekmeğe göre toplam karbonhidrat değişir'], advice: 'Limon ve bol yeşillikle tamamlayabilirsiniz.' },
+    { keys: ['salata'], name: 'Karışık Salata', calories: 120, protein: 3, carbs: 12, fat: 7, fiber: 5, healthScore: 95, pros: ['Lif açısından zengin'], cons: ['Sos ve yağ kaloriyi artırabilir'], advice: 'Yağ miktarını ölçerek ekleyin.' },
+    { keys: ['yoğurt', 'yogurt'], name: 'Yoğurt', calories: 120, protein: 7, carbs: 9, fat: 6, fiber: 0, healthScore: 90, pros: ['Protein ve kalsiyum kaynağı'], cons: ['Şekerli çeşitlerde kalori artabilir'], advice: 'Sade yoğurt tercih edin ve porsiyonu ölçün.' },
+    { keys: ['muz'], name: 'Muz', calories: 105, protein: 1, carbs: 27, fat: 0, fiber: 3, healthScore: 88, pros: ['Potasyum ve lif içerir'], cons: ['Doğal şeker içerir'], advice: 'Ara öğünde porsiyon kontrollü tüketebilirsiniz.' },
+    { keys: ['elma'], name: 'Elma', calories: 95, protein: 1, carbs: 25, fat: 0, fiber: 4, healthScore: 93, pros: ['Lif içerir'], cons: ['Doğal şeker içerir'], advice: 'Kabuklu tüketmek lif alımını artırır.' },
+  ];
+  const found = entries.find((entry) => entry.keys.some((key) => text.includes(key)));
+  if (found) return { ...found, breakdown: [{ item: found.name, calories: found.calories, amount: '1 standart porsiyon' }], confidence: 'medium', analysisMode: 'local-description', note: 'Ücretsiz yerel analiz. Değerler yaklaşık olup porsiyona göre değişebilir.' };
+  return { name: text ? text.slice(0, 80) : 'Fotoğraftaki yemek', calories: 250, protein: 15, carbs: 28, fat: 9, fiber: 4, healthScore: 80, pros: ['Analiz sonucu güvenli varsayılan olarak oluşturuldu'], cons: ['Yemeğin türü ve porsiyonu doğrulanmadı'], advice: 'Gemini kotası kullanılamadığı için bu sonuç yaklaşık yerel tahmindir. Yemeğin adını veya porsiyonunu yazarak sonucu netleştirin.', breakdown: [{ item: 'Yaklaşık standart öğün', calories: 250, amount: '1 porsiyon' }], confidence: 'low', analysisMode: 'local-safe-default', note: 'Ücretsiz yerel güvenli varsayılan. Fotoğraf görsel olarak doğrulanamadığı için kesin besin değeri değildir.' };
+}
+
+function localCoachFallback(userProfile: any, todaySummary: any, userMessage: string) {
+  const message = String(userMessage || '').trim();
+  const text = message.toLocaleLowerCase('tr-TR');
+  const target = Number(userProfile?.dailyCalorieTarget) || 0;
+  const consumed = Number(todaySummary?.consumedCalories) || 0;
+  const water = Number(todaySummary?.waterMl) || 0;
+  const waterTarget = Number(userProfile?.waterTargetMl) || 2000;
+  const remaining = target > 0 ? Math.max(0, target - consumed) : null;
+  const waterRemaining = Math.max(0, waterTarget - water);
+  if (/(kahve|kafein|çay|cay)/.test(text) && /(oruç|oruc|fast)/.test(text)) return 'Oruç penceresinde sade kahve veya şekersiz çay genellikle kalori açısından çok düşük olduğu için tercih edilebilir; ancak süt, şeker ve şuruplar kalori ekler. Oruç protokolünün kuralları kişiden kişiye değişebileceği için kendi planını esas al. Baş dönmesi veya kötü hissetme olursa orucu zorlamama.';
+  if (/(kilo.*(yavaş|dur|verem)|yavaşladı|yavasladi|plato|plateau)/.test(text)) return `Kilo kaybı yavaşladığında önce 1-2 haftalık gerçek trendi, porsiyonları ve günlük hareketi kontrol etmek iyi bir başlangıçtır. ${remaining === null ? 'Günlük kalori hedefini belirlediysen' : `Bugün yaklaşık ${remaining} kcal alanın kaldı`}. Aşırı kalori kısıtlamak yerine sürdürülebilir bir açık, yeterli protein, uyku ve düzenli hareketi koru.`;
+  if (/(akşam|aksam).*(yemek|ne yemel|öğün|ogun)|akşam yemeğinde|aksam yemeginde/.test(text)) return `Akşam için sebze + yağsız/az yağlı protein + kontrollü bir karbonhidrat kombinasyonu iyi bir seçenek olabilir. ${remaining !== null ? `Bugünkü yaklaşık ${remaining} kcal kalan bütçene göre porsiyonu ayarlayabilirsin.` : 'Porsiyonu açlık ve günlük hedefine göre ayarla.'}`;
+  if (/(protein|proteini).*(hedef|tamam|tamamla|eksik)|hedef.*protein|protein.*nasıl/.test(text)) return 'Protein hedefini tamamlamak için gün içine yayılmış yoğurt/kefir, yumurta, tavuk/hindi, balık, baklagiller veya uygun bir protein ürünü seçebilirsin. Tek öğünde yüklenmek yerine kalan ihtiyacı 1-2 öğüne bölmek daha sürdürülebilir olur.';
+  if (/(su|sıvı|sivi|hidrasyon|litre|ml)/.test(text)) return waterRemaining > 0 ? `Bugünkü su tüketimin hedefinin yaklaşık ${waterRemaining} ml altında. Bunu tek seferde içmek yerine gün içine bölerek tamamlamaya çalış.` : 'Bugünkü su hedefin dolmuş görünüyor. Gün boyunca susama durumuna göre düzenli içmeye devam et.';
+  if (/(kalori|kcal).*(kaç|kac|hesap|kalan|hedef)|kaç kalori|kac kalori/.test(text)) return remaining !== null ? `Bugünkü hedefin ${target} kcal ve kayıtlı tüketimin ${consumed} kcal; yaklaşık ${remaining} kcal kaldı.` : 'Kalori hedefini hesaplamak için yaş, boy, kilo, aktivite düzeyi ve hedef gibi bilgileri kullanmak gerekir.';
+  if (/(kahvaltı|kahvalti|sabah)/.test(text)) return 'Dengeli bir kahvaltı için protein + lif + kontrollü karbonhidrat iyi bir temel: örneğin yumurta ve yoğurt yanında sebze ve tam tahıllı küçük bir porsiyon.';
+  if (/(tatlı|tatli|şeker|seker|abur cubur|atıştır|atistir)/.test(text)) return 'Tatlı isteğinde önce porsiyonu küçültmek ve öğüne protein/lif eklemek yardımcı olabilir. Meyve + yoğurt gibi daha doyurucu bir alternatif deneyebilirsin.';
+  if (/(spor|egzersiz|yürüyüş|yuruyus|antrenman|hareket)/.test(text)) return 'Kilo yönetiminde düzenli hareket önemli. Günlük yürüyüş ve haftada birkaç gün kuvvet egzersizi iyi bir temel olabilir; kondisyonuna göre kademeli artır.';
+  return `Sorunu anladım: “${message.slice(0, 140)}”. Günlük kayıtlarını ve hedeflerini birlikte değerlendirmek en güvenli başlangıç. ${remaining !== null ? `Bugün yaklaşık ${remaining} kcal alanın kaldı.` : 'Günlük kalori hedefin kayıtlı değil.'}`;
+}
 
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
