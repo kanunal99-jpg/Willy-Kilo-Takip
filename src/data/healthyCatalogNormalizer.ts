@@ -24,7 +24,10 @@ function inferFoodCategory(name: string): string {
  */
 export function normalizeFood(raw: Record<string, unknown>): FoodItem {
   if (!MALFORMED_FOOD_IDS.has(String(raw.id)) || typeof raw.category !== 'number') {
-    return raw as FoodItem;
+    // The catalog is external/untyped JSON at this boundary. The runtime
+    // quality gate validates the record shape; widen through unknown for the
+    // intentional boundary assertion instead of suppressing TypeScript.
+    return raw as unknown as FoodItem;
   }
 
   return {
