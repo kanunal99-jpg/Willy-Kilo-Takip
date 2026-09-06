@@ -18,14 +18,9 @@ if (!/android:name=["']android\.permission\.CAMERA["']/.test(xml)) {
   xml = xml.slice(0, insertAt) + permission + xml.slice(insertAt);
 }
 
-const dependencyName = 'com.google.mlkit.vision.DEPENDENCIES';
-const metadataRegex = new RegExp(
-  `\\s*<meta-data\\b[^>]*android:name=["']${dependencyName.replace(/\./g, '\\\\.')}["'][^>]*/>`,
-  'g'
-);
-
-// Capacitor/ML Kit can already contribute this metadata. Remove every duplicate and
-// install exactly one deterministic barcode_ui declaration under <application>.
+// Remove every existing ML Kit dependency declaration, including ones injected by
+// Capacitor/ML Kit, then add exactly one deterministic barcode_ui declaration.
+const metadataRegex = /\s*<meta-data\b[^>]*android:name=["']com\.google\.mlkit\.vision\.DEPENDENCIES["'][^>]*\/?>/g;
 xml = xml.replace(metadataRegex, '');
 
 const applicationTag = xml.match(/<application\b[^>]*>/);
