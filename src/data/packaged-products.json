@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "source": "Open Food Facts + Willy local verified cache",
+  "licenseNote": "Open Food Facts data is open data; product data is community contributed and must be treated as potentially incomplete.",
+  "lastUpdated": "2026-09-06",
+  "products": [
+    {
+      "barcode": "3017624010701",
+      "name": "Nutella",
+      "brand": "Ferrero",
+      "category": "Kahvaltılık / Sürülebilir",
+      "unit": "100 g",
+      "servingGrams": 15,
+      "caloriesPer100g": 539,
+      "proteinPer100g": 6.3,
+      "carbsPer100g": 57.5,
+      "sugarPer100g": 56.3,
+      "fatPer100g": 30.9,
+      "saturatedFatPer100g": 10.6,
+      "fiberPer100g": 0,
+      "saltPer100g": 0.107,
+      "source": "Open Food Facts",
+      "sourceVerifiedAt": "2026-09-06"
+    }
+  ]
+}
