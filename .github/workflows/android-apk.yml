@@ -52,7 +52,7 @@ jobs:
         run: |
           test "$(grep -Fc 'android.permission.CAMERA' android/app/src/main/AndroidManifest.xml)" -ge 1
           test "$(grep -Fc 'com.google.mlkit.vision.DEPENDENCIES' android/app/src/main/AndroidManifest.xml)" -eq 1
-          test "$(grep -Fc 'android:value=\"barcode_ui\"' android/app/src/main/AndroidManifest.xml)" -eq 1
+          test "$(grep -Fc 'android:value="barcode_ui"' android/app/src/main/AndroidManifest.xml)" -eq 1
           echo "ML Kit barcode manifest verification PASS"
 
       - name: Setup Java
