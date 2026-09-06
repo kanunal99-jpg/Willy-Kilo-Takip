@@ -9,18 +9,18 @@ export interface AppVersionInfo {
 }
 
 export const APP_VERSION: AppVersionInfo = {
-  versionName: '1.0.6',
-  versionCode: 7,
-  releaseDate: '2026-09-05',
+  versionName: '1.0.10',
+  versionCode: 11,
+  releaseDate: '2026-09-06',
   minSupportedVersion: '1.0.3',
   apkUrl: 'https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest/download/WillyKiloTakip.apk',
   githubReleaseUrl: 'https://github.com/kanunal99-jpg/Willy-Kilo-Takip/releases/latest',
   releaseNotes: [
-    "Android native AI requests use Capacitor's bundled native HTTP transport",
-    'Production Render API bağlantısı ve gerçek Gemini AI Koçu güçlendirildi',
-    'Bulut senkronizasyon anahtarları yeni cihazlarda yüksek entropili hale getirildi',
-    'Bulut senkronizasyonu için istek hız sınırlaması ve veri doğrulaması eklendi',
-    'Senkronizasyon JSON yazımları atomik hale getirildi',
-    'Kalıcı release imzası ile OTA güncelleme zinciri korunuyor',
+    'Kalıcı kilo geçmişi ve tarih seçimi eklendi',
+    'Kilo geçmişi 7 günle sınırlı değil; tüm kayıtlar korunur',
+    'Gemini kota/ön ödeme tükenirse OpenAI AI fallback otomatik devreye girer',
+    'AI Tara fotoğraf analizi OpenAI görsel girişi ile fallback destekler',
+    'Willy Koç Gemini başarısız olduğunda OpenAI ile devam eder',
+    'Üretim API ve ML Kit barkod kamera desteği korunur',
   ],
 };
