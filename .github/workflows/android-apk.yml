@@ -1,6 +1,6 @@
 name: Android APK & GitHub Release
 
-# Release trigger verification: 2026-09-06
+# Release trigger verification: 2026-09-06 beverage catalog fix
 on:
   push:
     branches: [main]
@@ -83,36 +83,26 @@ jobs:
           KEY_PASSWORD: ${{ secrets.WILLY_RELEASE_KEY_PASSWORD }}
         run: |
           python3 - <<'PY'
-          import base64
-          import os
-          import re
+          import base64, os, re
           from pathlib import Path
           raw = os.environ['KEYSTORE_B64']
           clean = re.sub(r'[^A-Za-z0-9+/]', '', raw)
           clean += '=' * ((-len(clean)) % 4)
-          try:
-              data = base64.b64decode(clean, validate=True)
-          except Exception as exc:
-              raise SystemExit(f'ERROR: WILLY_RELEASE_KEYSTORE_BASE64 is not valid Base64: {exc}')
-          if not data:
-              raise SystemExit('ERROR: decoded keystore is empty')
+          try: data = base64.b64decode(clean, validate=True)
+          except Exception as exc: raise SystemExit(f'ERROR: invalid Base64: {exc}')
+          if not data: raise SystemExit('ERROR: decoded keystore is empty')
           Path('willy-release.jks').write_bytes(data)
           PY
-          openssl pkcs12 -in willy-release.jks -passin env:KEYSTORE_PASSWORD -noout >/dev/null 2>&1 || {
-            echo "ERROR: decoded keystore is not a valid PKCS12 keystore or the password is incorrect."; exit 1;
-          }
+          openssl pkcs12 -in willy-release.jks -passin env:KEYSTORE_PASSWORD -noout >/dev/null 2>&1 || { echo "ERROR: invalid PKCS12 keystore or password."; exit 1; }
           python3 - <<'PY'
           from pathlib import Path
           import re
-          p = Path('app/build.gradle')
-          s = p.read_text()
-          signing = '''\n    signingConfigs {\n        release {\n            storeFile file("../willy-release.jks")\n            storeType "PKCS12"\n            storePassword System.getenv("KEYSTORE_PASSWORD")\n            keyAlias System.getenv("KEY_ALIAS")\n            keyPassword System.getenv("KEY_PASSWORD")\n        }\n    }\n'''
-          if 'signingConfigs {' not in s:
-              s = s.replace('android {', 'android {' + signing, 1)
+          p=Path('app/build.gradle'); s=p.read_text()
+          signing='''\n    signingConfigs {\n        release {\n            storeFile file("../willy-release.jks")\n            storeType "PKCS12"\n            storePassword System.getenv("KEYSTORE_PASSWORD")\n            keyAlias System.getenv("KEY_ALIAS")\n            keyPassword System.getenv("KEY_PASSWORD")\n        }\n    }\n'''
+          if 'signingConfigs {' not in s: s=s.replace('android {','android {'+signing,1)
           if 'signingConfig signingConfigs.release' not in s:
-              s, count = re.subn(r'(buildTypes\s*\{\s*release\s*\{)', r'\1\n            signingConfig signingConfigs.release', s, count=1)
-              if count != 1:
-                  raise SystemExit('Could not locate android buildTypes.release block')
+              s,count=re.subn(r'(buildTypes\s*\{\s*release\s*\{)',r'\1\n            signingConfig signingConfigs.release',s,count=1)
+              if count!=1: raise SystemExit('Could not locate buildTypes.release')
           p.write_text(s)
           PY
 
@@ -159,6 +149,7 @@ jobs:
             - 📱 PWA & Offline-First
             - 🔐 Kalıcı release imzası ile güvenli Android güncelleme zinciri
             - 📷 ML Kit gerçek kamera barkod tarama zinciri
+            - 🥤 10.000+ alkolsüz içecek varyantı, butonlu miktar/hedef/kalori/süre filtreleri
             - ⚡ TypeScript doğrulaması ve performans iyileştirmeleri
             **İndirme:** `WillyKiloTakip.apk`
           files: |
@@ -166,8 +157,7 @@ jobs:
             release-assets/WillyKiloTakip-v${{ steps.version.outputs.VERSION }}.apk
           draft: false
           prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          env: GITHUB_TOKEN
 
       - name: Wait for Render production deploy
         if: github.ref == 'refs/heads/main'
@@ -179,10 +169,6 @@ jobs:
         run: |
           set -euo pipefail
           payload='{"message":"Kısa bir selam ver ve bugün su tüketimi için tek bir uygulanabilir öneri yaz.","userProfile":{"name":"SmokeTest","goal":"lose_weight","currentWeightKg":80,"targetWeightKg":75,"dailyCalorieTarget":2000,"waterTargetMl":2000},"todaySummary":{"consumedCalories":500,"burnedCalories":0,"waterMl":500,"fastingActive":false}}'
-          response=$(curl --fail-with-body --silent --show-error --max-time 90 \
-            -X POST 'https://willy-kilo-takip.onrender.com/api/ai/coach' \
-            -H 'Content-Type: application/json' \
-            -H 'Accept: application/json' \
-            --data "$payload")
+          response=$(curl --fail-with-body --silent --show-error --max-time 90 -X POST 'https://willy-kilo-takip.onrender.com/api/ai/coach' -H 'Content-Type: application/json' -H 'Accept: application/json' --data "$payload")
           echo "$response"
           node -e 'const r=JSON.parse(process.argv[1]); if (!r.success || !r.reply || !r.model) { console.error("AI smoke test failed", r); process.exit(1) } console.log(`AI smoke test PASS model=${r.model}`)' "$response"
