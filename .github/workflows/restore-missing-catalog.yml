@@ -21,9 +21,9 @@ jobs:
       - name: Commit restored catalog
         run: |
           set -euo pipefail
-          if git diff --quiet -- src/data/healthy_catalog.json; then echo 'Catalog already present; nothing to commit.'; exit 0; fi
+          git add src/data/healthy_catalog.json
+          if git diff --cached --quiet -- src/data/healthy_catalog.json; then echo 'Catalog already identical; nothing to commit.'; exit 0; fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/data/healthy_catalog.json
           git commit -m 'fix: restore healthy catalog data'
           git push origin HEAD:main
