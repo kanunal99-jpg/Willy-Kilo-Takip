@@ -1,88 +1,29 @@
 const baseUrl = String(process.env.BASE_URL || 'https://willy-kilo-takip.onrender.com').replace(/\/$/, '');
 
 const cases = [
-  {
-    name: 'kilo-plato',
-    question: 'Kilo vermem neden son haftalarda yavaşladı?',
-    mustInclude: [/kilo|açık|kalori|hareket|uyku|porsiyon|plato|metabol/i],
-    forbidden: [/ödemi at|metabolizmanı canlandır/i],
-  },
-  {
-    name: 'aksam-porsiyon',
-    question: 'Akşam kavurma ve pilav yersem porsiyonu nasıl ayarlamalıyım?',
-    mustInclude: [/kavurma|pilav|porsiyon|gram|kaşık|sebze|yoğurt/i],
-    forbidden: [],
-  },
-  {
-    name: 'protein',
-    question: 'Protein hedefimi gün içinde pratik olarak nasıl tamamlarım?',
-    mustInclude: [/protein|yoğurt|yumurta|tavuk|balık|baklagil/i],
-    forbidden: [],
-  },
-  {
-    name: 'su',
-    question: 'Bugün su hedefime ulaşmak için nasıl bir plan yapayım?',
-    mustInclude: [/su|hidrasyon|ml|litre|iç/i],
-    forbidden: [],
-  },
-  {
-    name: 'egzersiz',
-    question: 'Kilo verirken haftalık egzersizimi nasıl düzenleyebilirim?',
-    mustInclude: [/egzersiz|yürüyüş|antrenman|kuvvet|hareket/i],
-    forbidden: [],
-  },
-  {
-    name: 'uyku',
-    question: 'Uyku düzenim bozuksa kilo verme hedefimi nasıl etkileyebilir?',
-    mustInclude: [/uyku|dinlen|iştah|enerji|stres/i],
-    forbidden: [],
-  },
-  {
-    name: 'tatli',
-    question: 'Akşam tatlı krizini daha kolay yönetmek için ne yapabilirim?',
-    mustInclude: [/tatlı|şeker|atıştır|porsiyon|yoğurt|meyve|lif/i],
-    forbidden: [],
-  },
-  {
-    name: 'kahvalti',
-    question: 'Kahvaltıda daha tok kalmak için neyi değiştirebilirim?',
-    mustInclude: [/kahvalt|protein|lif|yumurta|yoğurt|sebze/i],
-    forbidden: [],
-  },
-  {
-    name: 'kaçamak',
-    question: 'Bir öğünde hedefimden fazla yediysem ertesi gün ne yapmalıyım?',
-    mustInclude: [/öğün|denge|normal|kalori|açlık|telafi/i],
-    forbidden: [/aç kal|öğün atla/i],
-  },
-  {
-    name: 'genel',
-    question: 'Motivasyonumu korumak için günlük olarak neye odaklanmalıyım?',
-    mustInclude: [/hedef|alışkan|küçük|takip|motivasyon|düzen/i],
-    forbidden: [],
-  },
+  { name: 'kilo-plato', question: 'Kilo vermem neden son haftalarda yavaşladı?', mustInclude: [/kilo|açık|kalori|hareket|uyku|porsiyon|plato|metabol/i], forbidden: [/ödemi at|metabolizmanı canlandır|kesinlikle kilo verdir|garanti kilo/i] },
+  { name: 'aksam-porsiyon', question: 'Akşam kavurma ve pilav yersem porsiyonu nasıl ayarlamalıyım?', mustInclude: [/kavurma|pilav|porsiyon|gram|kaşık|sebze|yoğurt/i], forbidden: [] },
+  { name: 'protein', question: 'Protein hedefimi gün içinde pratik olarak nasıl tamamlarım?', mustInclude: [/protein|yoğurt|yumurta|tavuk|balık|baklagil/i], forbidden: [] },
+  { name: 'su', question: 'Bugün su hedefime ulaşmak için nasıl bir plan yapayım?', mustInclude: [/su|hidrasyon|ml|litre|iç/i], forbidden: [] },
+  { name: 'egzersiz', question: 'Kilo verirken haftalık egzersizimi nasıl düzenleyebilirim?', mustInclude: [/egzersiz|yürüyüş|antrenman|kuvvet|hareket/i], forbidden: [] },
+  { name: 'uyku', question: 'Uyku düzenim bozuksa kilo verme hedefimi nasıl etkileyebilir?', mustInclude: [/uyku|dinlen|iştah|enerji|stres/i], forbidden: [] },
+  { name: 'tatli', question: 'Akşam tatlı krizini daha kolay yönetmek için ne yapabilirim?', mustInclude: [/tatlı|şeker|atıştır|porsiyon|yoğurt|meyve|lif/i], forbidden: [] },
+  { name: 'kahvalti', question: 'Kahvaltıda daha tok kalmak için neyi değiştirebilirim?', mustInclude: [/kahvalt|protein|lif|yumurta|yoğurt|sebze/i], forbidden: [] },
+  { name: 'kaçamak', question: 'Bir öğünde hedefimden fazla yediysem ertesi gün ne yapmalıyım?', mustInclude: [/öğün|denge|normal|kalori|açlık|telafi/i], forbidden: [/aç kal|öğün atla/i] },
+  { name: 'genel', question: 'Motivasyonumu korumak için günlük olarak neye odaklanmalıyım?', mustInclude: [/hedef|alışkan|küçük|takip|motivasyon|düzen/i], forbidden: [] },
 ];
 
 const context = {
-  userProfile: {
-    dailyCalorieTarget: 2200,
-    waterTargetMl: 2500,
-    goal: 'weight_loss',
-    activityLevel: 'moderate',
-  },
-  todaySummary: {
-    consumedCalories: 1650,
-    waterMl: 750,
-  },
+  userProfile: { dailyCalorieTarget: 2200, waterTargetMl: 2500, goal: 'weight_loss', activityLevel: 'moderate' },
+  todaySummary: { consumedCalories: 1650, waterMl: 750 },
 };
 
 const responses = [];
 const failures = [];
 
-for (const test of cases) {
+for (const [index, test] of cases.entries()) {
   const response = await fetch(`${baseUrl}/api/ai/coach`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message: test.question, ...context }),
   });
   const body = await response.json().catch(() => ({}));
@@ -97,6 +38,9 @@ for (const test of cases) {
   responses.push({ name: test.name, question: test.question, reply });
   console.log(`CASE ${test.name}: provider=${body?.provider} model=${body?.model} fallback=${body?.fallback}`);
   console.log(`REPLY ${reply.replace(/\s+/g, ' ').slice(0, 500)}`);
+
+  // Free-tier RPM protection: avoid manufacturing a quota failure by firing all cases in one burst.
+  if (index < cases.length - 1) await new Promise((resolve) => setTimeout(resolve, 4000));
 }
 
 const normalized = responses.map((item) => item.reply.toLocaleLowerCase('tr-TR').replace(/\s+/g, ' ').trim());
