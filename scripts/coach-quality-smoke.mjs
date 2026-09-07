@@ -9,7 +9,7 @@ const cases = [
   { name: 'uyku', question: 'Uyku düzenim bozuksa kilo verme hedefimi nasıl etkileyebilir?', mustInclude: [/uyku|dinlen|iştah|enerji|stres/i], forbidden: [] },
   { name: 'tatli', question: 'Akşam tatlı krizini daha kolay yönetmek için ne yapabilirim?', mustInclude: [/tatlı|şeker|atıştır|porsiyon|yoğurt|meyve|lif/i], forbidden: [] },
   { name: 'kahvalti', question: 'Kahvaltıda daha tok kalmak için neyi değiştirebilirim?', mustInclude: [/kahvalt|protein|lif|yumurta|yoğurt|sebze/i], forbidden: [] },
-  { name: 'kaçamak', question: 'Bir öğünde hedefimden fazla yediysem ertesi gün ne yapmalıyım?', mustInclude: [/öğün|denge|normal|kalori|açlık|telafi/i], forbidden: [/aç kal|öğün atla/i] },
+  { name: 'kaçamak', question: 'Bir öğünde hedefimden fazla yediysem ertesi gün ne yapmalıyım?', mustInclude: [/öğün|denge|normal|kalori|açlık|telafi/i], forbidden: [/\baç\s+kal(?!ma\b)|\böğün(?:ü|ünü)?\s+atla(?!ma\b)/i] },
   { name: 'genel', question: 'Motivasyonumu korumak için günlük olarak neye odaklanmalıyım?', mustInclude: [/hedef|alışkan|küçük|takip|motivasyon|düzen/i], forbidden: [] },
 ];
 
