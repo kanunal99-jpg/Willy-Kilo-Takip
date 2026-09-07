@@ -38,5 +38,9 @@
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.3",
     "typescript": "~5.8.2"
+  },
+  "overrides": {
+    "protobufjs": "^7.6.0",
+    "ws": "^8.20.1"
   }
 }
