@@ -1,7 +1,7 @@
 {
   "name": "willy-kilo-takip",
   "private": true,
-  "version": "1.0.22",
+  "version": "1.0.23",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
@@ -31,14 +31,9 @@
     "react-dom": "^19.0.1",
     "vite": "^6.2.3",
     "vite-plugin-pwa": "^1.3.0",
-    "tailwindcss": "~4.1.14"
-  },
-  "devDependencies": {
-    "@capacitor/cli": "^7.4.3",
-    "@types/node": "^22.14.0",
-    "autoprefixer": "^10.4.3",
     "typescript": "~5.8.2"
   },
+  "devDependencies": {},
   "overrides": {
     "protobufjs": "^7.6.0",
     "ws": "^8.20.1"
