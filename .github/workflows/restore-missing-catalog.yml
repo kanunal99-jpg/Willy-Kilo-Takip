@@ -1,0 +1,30 @@
+name: Restore historical healthy catalog
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/restore-missing-catalog.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Restore catalog from last known good commit
+        run: |
+          set -euo pipefail
+          git checkout 48ce0ab417038b8b352bb95c513897dcdcdd747f -- src/data/healthy_catalog.json
+          test -s src/data/healthy_catalog.json
+          node -e "const d=require('./src/data/healthy_catalog.json'); if(d.totalEntries!==528 || d.foods.length!==385 || d.recipes.length!==143) throw new Error('catalog integrity mismatch'); console.log('catalog integrity PASS', d.totalEntries)"
+      - name: Commit restored catalog
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- src/data/healthy_catalog.json; then echo 'Catalog already present; nothing to commit.'; exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/data/healthy_catalog.json
+          git commit -m 'fix: restore healthy catalog data'
+          git push origin HEAD:main
