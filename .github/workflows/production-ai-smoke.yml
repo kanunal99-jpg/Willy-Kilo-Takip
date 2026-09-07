@@ -5,25 +5,45 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: production-ai-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   production-ai-smoke:
     runs-on: ubuntu-latest
     steps:
       - name: Wait for Render deployment
-        run: sleep 120
+        env:
+          EXPECTED_COMMIT: ${{ github.sha }}
+          BASE_URL: https://willy-kilo-takip.onrender.com
+        run: |
+          set -euo pipefail
+          for i in {1..30}; do
+            code=$(curl -sS -o /tmp/health.json -w '%{http_code}' --max-time 20 "$BASE_URL/api/health" || true)
+            cat /tmp/health.json || true
+            deployed=$(node -e "try { const j=require('/tmp/health.json'); process.stdout.write(String(j.deployCommit||'')); } catch (_) {}")
+            echo "health=$code expected=$EXPECTED_COMMIT deployed=$deployed"
+            if [ "$code" = "200" ] && [ "${deployed,,}" = "${EXPECTED_COMMIT,,}" ]; then exit 0; fi
+            sleep 10
+          done
+          exit 1
 
       - name: Test production health and Gemini readiness
+        env:
+          EXPECTED_COMMIT: ${{ github.sha }}
         run: |
           set -euo pipefail
           response=$(curl --fail-with-body --silent --show-error --max-time 30 'https://willy-kilo-takip.onrender.com/api/health')
           echo "$response"
-          RESPONSE="$response" python3 - <<'PY'
+          RESPONSE="$response" EXPECTED_COMMIT="$EXPECTED_COMMIT" python3 - <<'PY'
           import json, os
           d=json.loads(os.environ['RESPONSE'])
           assert d.get('aiEnabled') is True, d
           providers=d.get('aiProviders') or []
           assert 'gemini' in providers, d
-          print('PRODUCTION GEMINI READINESS PASS')
+          assert str(d.get('deployCommit','')).lower() == os.environ['EXPECTED_COMMIT'].lower(), d
+          print('PRODUCTION GEMINI READINESS + EXACT COMMIT PASS')
           PY
 
       - name: Test four different coach questions with real Gemini
