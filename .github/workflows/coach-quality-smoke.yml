@@ -1,20 +1,28 @@
 name: Coach Quality Smoke
 
 on:
-  push:
-    branches: [main]
+  workflow_run:
+    workflows: ["Production AI Smoke Tests"]
+    types: [completed]
   workflow_dispatch:
+
+concurrency:
+  group: coach-quality-${{ github.event.workflow_run.head_sha || github.sha }}
+  cancel-in-progress: true
 
 jobs:
   coach-quality-smoke:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main') }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout tested commit
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Wait for exact Render deployment
         env:
-          EXPECTED_COMMIT: ${{ github.sha }}
+          EXPECTED_COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
           BASE_URL: https://willy-kilo-takip.onrender.com
         run: |
           set -euo pipefail
