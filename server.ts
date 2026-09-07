@@ -49,7 +49,6 @@ function loadCloudDb(): CloudDb {
 
 function saveCloudDb(data: CloudDb) {
   try {
-    // Atomic replace prevents a concurrent write or process interruption from corrupting the JSON database.
     const tempFile = `${SYNC_FILE}.tmp`;
     fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), 'utf-8');
     fs.renameSync(tempFile, SYNC_FILE);
@@ -85,7 +84,6 @@ function allowRate(map: Map<string, RateEntry>, ip: string, max: number): boolea
 }
 
 function syncKeyLooksValid(key: string): boolean {
-  // Supports legacy WILLY-123456 keys and new WILLY- + 32 hex-character keys.
   return /^WILLY-(?:\d{6}|[A-F0-9]{32})$/i.test(key);
 }
 
@@ -157,7 +155,7 @@ function parseAiJson(text: string): any {
 }
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', app: 'Willy Kilo Takip', aiEnabled: !!(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY), aiProviders: { gemini: !!process.env.GEMINI_API_KEY, openai: !!process.env.OPENAI_API_KEY }, timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', app: 'Willy Kilo Takip', aiEnabled: !!(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY), aiProviders: { gemini: !!process.env.GEMINI_API_KEY, openai: !!process.env.OPENAI_API_KEY }, deployCommit: process.env.RENDER_GIT_COMMIT || null, deployBranch: process.env.RENDER_GIT_BRANCH || null, timestamp: new Date().toISOString() });
 });
 
 const VERSION_FILE = path.join(process.cwd(), 'version.json');
@@ -278,36 +276,57 @@ function localFoodAnalysisFallback(description = '', mealType = 'lunch') {
   const entries = [
     { keys: ['yumurta', 'omlet'], name: 'Yumurta / Omlet', calories: 180, protein: 13, carbs: 2, fat: 13, fiber: 0, healthScore: 88, pros: ['İyi protein kaynağı'], cons: ['Porsiyona göre yağ miktarı değişebilir'], advice: 'Pişirme yağını ve eklenen malzemeleri ayrıca hesaba katın.' },
     { keys: ['tavuk', 'ızgara tavuk', 'tavuk göğsü'], name: 'Tavuk Göğsü', calories: 250, protein: 46, carbs: 0, fat: 6, fiber: 0, healthScore: 92, pros: ['Yüksek protein'], cons: ['Porsiyon büyüdükçe kalori artar'], advice: 'Yanına sebze ekleyerek öğünü dengeli tutabilirsiniz.' },
-    { keys: ['pilav', 'pirinç'], name: 'Pirinç Pilavı', calories: 260, protein: 5, carbs: 50, fat: 5, fiber: 1, healthScore: 74, pros: ['Enerji sağlar'], cons: ['Karbonhidrat yoğun'], advice: 'Porsiyonu ölçerek protein ve sebze ile dengeleyin.' },
-    { keys: ['makarna'], name: 'Makarna', calories: 300, protein: 10, carbs: 55, fat: 6, fiber: 3, healthScore: 76, pros: ['Pratik enerji kaynağı'], cons: ['Sos ve yağ kaloriyi yükseltebilir'], advice: 'Sos ve yağ miktarını kontrol edin; yanına protein ve sebze ekleyin.' },
-    { keys: ['mercimek çorba', 'mercimek corba', 'mercimek'], name: 'Mercimek Çorbası', calories: 180, protein: 9, carbs: 27, fat: 5, fiber: 7, healthScore: 90, pros: ['Lif ve bitkisel protein içerir'], cons: ['Ekmeğe göre toplam karbonhidrat değişir'], advice: 'Limon ve bol yeşillikle tamamlayabilirsiniz.' },
-    { keys: ['salata'], name: 'Karışık Salata', calories: 120, protein: 3, carbs: 12, fat: 7, fiber: 5, healthScore: 95, pros: ['Lif açısından zengin'], cons: ['Sos ve yağ kaloriyi artırabilir'], advice: 'Yağ miktarını ölçerek ekleyin.' },
-    { keys: ['yoğurt', 'yogurt'], name: 'Yoğurt', calories: 120, protein: 7, carbs: 9, fat: 6, fiber: 0, healthScore: 90, pros: ['Protein ve kalsiyum kaynağı'], cons: ['Şekerli çeşitlerde kalori artabilir'], advice: 'Sade yoğurt tercih edin ve porsiyonu ölçün.' },
-    { keys: ['muz'], name: 'Muz', calories: 105, protein: 1, carbs: 27, fat: 0, fiber: 3, healthScore: 88, pros: ['Potasyum ve lif içerir'], cons: ['Doğal şeker içerir'], advice: 'Ara öğünde porsiyon kontrollü tüketebilirsiniz.' },
-    { keys: ['elma'], name: 'Elma', calories: 95, protein: 1, carbs: 25, fat: 0, fiber: 4, healthScore: 93, pros: ['Lif içerir'], cons: ['Doğal şeker içerir'], advice: 'Kabuklu tüketmek lif alımını artırır.' },
+    { keys: ['yoğurt', 'yogurt'], name: 'Yoğurt', calories: 120, protein: 8, carbs: 9, fat: 5, fiber: 0, healthScore: 90, pros: ['Protein ve kalsiyum içerir'], cons: ['Şekerli çeşitlerde ilave şeker olabilir'], advice: 'Şekersiz/ sade yoğurt tercih edebilirsiniz.' },
   ];
-  const found = entries.find((entry) => entry.keys.some((key) => text.includes(key)));
-  if (found) return { ...found, breakdown: [{ item: found.name, calories: found.calories, amount: '1 standart porsiyon' }], confidence: 'medium', analysisMode: 'local-description', note: 'Ücretsiz yerel analiz. Değerler yaklaşık olup porsiyona göre değişebilir.' };
-  return { name: text ? text.slice(0, 80) : 'Fotoğraftaki yemek', calories: 250, protein: 15, carbs: 28, fat: 9, fiber: 4, healthScore: 80, pros: ['Analiz sonucu güvenli varsayılan olarak oluşturuldu'], cons: ['Yemeğin türü ve porsiyonu doğrulanmadı'], advice: 'Gemini kotası kullanılamadığı için bu sonuç yaklaşık yerel tahmindir. Yemeğin adını veya porsiyonunu yazarak sonucu netleştirin.', breakdown: [{ item: 'Yaklaşık standart öğün', calories: 250, amount: '1 porsiyon' }], confidence: 'low', analysisMode: 'local-safe-default', note: 'Ücretsiz yerel güvenli varsayılan. Fotoğraf görsel olarak doğrulanmadığı için kesin besin değeri değildir.' };
+  const match = entries.find((entry) => entry.keys.some((key) => text.includes(key)));
+  return { name: match?.name || (description || 'Dengeli Sağlıklı Tabak'), calories: match?.calories || 385, protein: match?.protein || 26, carbs: match?.carbs || 32, fat: match?.fat || 14, fiber: match?.fiber || 5, healthScore: match?.healthScore || 82, pros: match?.pros || ['Porsiyon kontrolü yapılabilir'], cons: match?.cons || ['Besin değerleri yaklaşık olabilir'], advice: match?.advice || 'Porsiyonu ve eklenen sos/yağı ayrıca değerlendirin.', breakdown: [], analysisMode: 'local-safe-default' };
 }
 
-function localCoachFallback(userProfile: any, todaySummary: any, userMessage: string) {
-  const message = String(userMessage || '').trim(); const text = message.toLocaleLowerCase('tr-TR'); const target = Number(userProfile?.dailyCalorieTarget) || 0; const consumed = Number(todaySummary?.consumedCalories) || 0; const water = Number(todaySummary?.waterMl) || 0; const waterTarget = Number(userProfile?.waterTargetMl) || 2000; const remaining = target > 0 ? Math.max(0, target - consumed) : null; const waterRemaining = Math.max(0, waterTarget - water);
-  if (/(kahve|kafein|çay|cay)/.test(text) && /(oruç|oruc|fast)/.test(text)) return 'Oruç penceresinde sade kahve veya şekersiz çay genellikle kalori açısından çok düşük olduğu için tercih edilebilir; ancak süt, şeker ve şuruplar kalori ekler. Oruç protokolünün kuralları kişiden kişiye değişebileceği için kendi planını esas al.';
-  if (/(kilo.*(yavaş|dur|verem)|yavaşladı|yavasladi|plato|plateau)/.test(text)) return `Kilo kaybı yavaşladığında önce 1-2 haftalık gerçek trendi, porsiyonları ve günlük hareketi kontrol etmek iyi bir başlangıçtır. ${remaining === null ? 'Günlük kalori hedefini belirlediysen' : `Bugün yaklaşık ${remaining} kcal alanın kaldı`}. Aşırı kalori kısıtlamak yerine sürdürülebilir bir açık, yeterli protein, uyku ve düzenli hareketi koru.`;
-  if (/(akşam|aksam).*(yemek|ne yemel|öğün|ogun)|akşam yemeğinde|aksam yemeginde/.test(text)) return `Akşam için sebze + yağsız/az yağlı protein + kontrollü bir karbonhidrat kombinasyonu iyi bir seçenek olabilir. ${remaining !== null ? `Bugünkü yaklaşık ${remaining} kcal kalan bütçene göre porsiyonu ayarlayabilirsin.` : 'Porsiyonu açlık ve günlük hedefine göre ayarla.'}`;
-  if (/(protein|proteini).*(hedef|tamam|tamamla|eksik)|hedef.*protein|protein.*nasıl/.test(text)) return 'Protein hedefini tamamlamak için gün içine yayılmış yoğurt/kefir, yumurta, tavuk/hindi, balık, baklagiller veya uygun bir protein ürünü seçebilirsin.';
-  if (/(su|sıvı|sivi|hidrasyon|litre|ml)/.test(text)) return waterRemaining > 0 ? `Bugünkü su tüketimin hedefinin yaklaşık ${waterRemaining} ml altında. Bunu tek seferde içmek yerine gün içine bölerek tamamlamaya çalış.` : 'Bugünkü su hedefin dolmuş görünüyor. Gün boyunca susama durumuna göre düzenli içmeye devam et.';
-  if (/(kalori|kcal).*(kaç|kac|hesap|kalan|hedef)|kaç kalori|kac kalori/.test(text)) return remaining !== null ? `Bugünkü hedefin ${target} kcal ve kayıtlı tüketimin ${consumed} kcal; yaklaşık ${remaining} kcal kaldı.` : 'Kalori hedefini hesaplamak için yaş, boy, kilo, aktivite düzeyi ve hedef gibi bilgileri kullanmak gerekir.';
-  if (/(kahvaltı|kahvalti|sabah)/.test(text)) return 'Dengeli bir kahvaltı için protein + lif + kontrollü karbonhidrat iyi bir temel: örneğin yumurta ve yoğurt yanında sebze ve tam tahıllı küçük bir porsiyon.';
-  if (/(tatlı|tatli|şeker|seker|abur cubur|atıştır|atistir)/.test(text)) return 'Tatlı isteğinde önce porsiyonu küçültmek ve öğüne protein/lif eklemek yardımcı olabilir. Meyve + yoğurt gibi daha doyurucu bir alternatif deneyebilirsin.';
-  if (/(spor|egzersiz|yürüyüş|yuruyus|antrenman|hareket)/.test(text)) return 'Kilo yönetiminde düzenli hareket önemli. Günlük yürüyüş ve haftada birkaç gün kuvvet egzersizi iyi bir temel olabilir; kondisyonuna göre kademeli artır.';
-  return `Sorunu anladım: “${message.slice(0, 140)}”. Günlük kayıtlarını ve hedeflerini birlikte değerlendirmek en güvenli başlangıç. ${remaining !== null ? `Bugün yaklaşık ${remaining} kcal alanın kaldı.` : 'Günlük kalori hedefin kayıtlı değil.'}`;
+function localCoachFallback(userProfile: any = {}, todaySummary: any = {}, userMessage = '') {
+  const target = Number(userProfile?.dailyCalorieTarget) || 1800;
+  const waterTarget = Number(userProfile?.waterTargetMl) || 2000;
+  const consumed = Number(todaySummary?.consumedCalories) || 0;
+  const water = Number(todaySummary?.waterMl) || 0;
+  const q = String(userMessage || '').toLocaleLowerCase('tr-TR');
+  if (/protein/.test(q)) return `Protein hedefini tamamlamak için öğünlerine yoğurt, yumurta, tavuk, balık veya baklagil gibi kaynaklardan birini ekleyebilirsin. Günlük hedefini tek öğünde kapatmak yerine gün içine yaymak daha pratik olabilir.`;
+  if (/su|hidrasyon|iç/.test(q)) return `Bugün ${water} ml su içtiysen hedefin ${waterTarget} ml. Günün kalanına bölerek düzenli aralıklarla su içmeyi deneyebilirsin.`;
+  if (/tatlı|şeker/.test(q)) return 'Tatlı isteğinde önce normal bir öğün düzenini koru; ardından küçük bir porsiyon, meyve veya sade yoğurt gibi seçenekleri değerlendirebilirsin.';
+  return `Bugünkü hedefin yaklaşık ${target} kcal. Şu ana kadar ${consumed} kcal aldıysan kalan öğününü dengeli bir protein, sebze ve uygun porsiyon karbonhidratla planlayabilirsin.`;
 }
+
+app.get('/api/products/barcode/:barcode', async (req, res) => {
+  const barcode = String(req.params.barcode || '').replace(/\D/g, '').slice(0, 18);
+  if (barcode.length < 8) return res.status(400).json({ success: false, error: 'Geçersiz barkod.', code: 'INVALID_BARCODE' });
+  const file = path.join(process.cwd(), 'src', 'data', 'packaged-products.json');
+  try {
+    if (fs.existsSync(file)) {
+      const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+      const local = Array.isArray(parsed?.products) ? parsed.products.find((item: any) => String(item?.barcode || '').replace(/\D/g, '') === barcode) : null;
+      if (local) return res.json({ success: true, found: true, source: 'local-catalog', cached: true, data: local });
+    }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4500);
+    const response = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}?fields=code,product_name,brands,categories,serving_size,nutriments`, { headers: { 'User-Agent': 'WillyKiloTakip/1.0 (nutrition lookup)' }, signal: controller.signal });
+    clearTimeout(timeout);
+    if (!response.ok) throw new Error(`Open Food Facts HTTP ${response.status}`);
+    const payload: any = await response.json();
+    if (payload?.status !== 1 || !payload?.product) return res.json({ success: true, found: false, source: 'open-food-facts', code: 'PRODUCT_NOT_FOUND' });
+    return res.json({ success: true, found: true, source: 'open-food-facts', cached: false, data: payload.product });
+  } catch (error: any) {
+    console.error('Packaged product lookup failed:', error?.message || error);
+    return res.status(503).json({ success: false, found: false, source: 'fallback', code: 'PRODUCT_LOOKUP_UNAVAILABLE', error: 'Ürün kataloğu geçici olarak erişilemiyor.' });
+  }
+});
 
 async function startServer() {
-  if (process.env.NODE_ENV !== 'production') { const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa' }); app.use(vite.middlewares); }
-  else { const distPath = path.join(process.cwd(), 'dist'); app.use(express.static(distPath)); app.get('*', (req, res) => res.sendFile(path.join(distPath, 'index.html'))); }
-  app.listen(PORT, '0.0.0.0', () => console.log(`Willy Kilo Takip server running on http://0.0.0.0:${PORT}`));
+  if (process.env.NODE_ENV !== 'production') {
+    const vite = await createViteServer({ server: { middlewareMode: true }, appType: 'spa' });
+    app.use(vite.middlewares);
+  } else {
+    app.use(express.static(path.join(process.cwd(), 'dist')));
+    app.get('*', (req, res) => res.sendFile(path.join(process.cwd(), 'dist', 'index.html')));
+  }
+  app.listen(PORT, () => console.log(`Willy Kilo Takip server running on port ${PORT}`));
 }
+
 startServer();
