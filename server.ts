@@ -245,12 +245,25 @@ app.post('/api/ai/coach', async (req, res) => {
     const { message: userMessage, userProfile, todaySummary } = req.body || {};
     const safeMessage = String(userMessage || '').trim().slice(0, 1000);
     if (!safeMessage) return res.status(400).json({ success: false, error: 'Mesaj boş olamaz.', code: 'INVALID_AI_MESSAGE' });
-    const systemPrompt = `Sen Willy Kilo Takip uygulamasının kişisel beslenme koçusun. Kullanıcının profil ve günlük özetine göre Türkçe, pratik ve sürdürülebilir öneriler ver. Tıbbi tanı koyma. Profil: ${JSON.stringify(userProfile || {})}. Bugün: ${JSON.stringify(todaySummary || {})}. Kullanıcı: ${JSON.stringify(safeMessage)}`;
+    const systemPrompt = `Sen Willy Kilo Takip uygulamasının kişisel beslenme koçusun. Türkçe, pratik ve sürdürülebilir öneriler ver. Tıbbi tanı koyma ve kesin/garantili sağlık sonucu iddia etme. Kullanıcı profilini ve bugünün özetini yalnızca mevcut soruyla doğrudan ilgili olduğunda kullan; soruyla ilgisiz günlük metrikleri cevaba taşıma. Nedensel sağlık iddialarını kesin dille kurma; belirsizlik varsa açıkça belirt. Kullanıcıya uygulanabilir porsiyon, alışkanlık ve takip önerileri sun. Profil: ${JSON.stringify(userProfile || {})}. Bugün: ${JSON.stringify(todaySummary || {})}. Kullanıcı sorusu: ${JSON.stringify(safeMessage)}`;
     const ai = getGemini(); let lastError: any = null;
     if (ai) {
-      for (const model of ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash']) {
-        try { const response = await ai.models.generateContent({ model, contents: systemPrompt }); const reply = String(response.text || '').trim(); if (!reply) throw new Error('Gemini boş yanıt döndürdü.'); console.log(`AI Coach success provider=gemini model=${model} durationMs=${Date.now() - startedAt}`); return res.json({ success: true, reply, model, provider: 'gemini', fallback: false }); }
-        catch (err: any) { lastError = err; console.error(`AI Coach Gemini model=${model} failed${isGeminiQuotaError(err) ? ' (quota/billing)' : ''}:`, err?.message || err); if (isGeminiQuotaError(err)) break; }
+      const models = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash'];
+      for (let round = 0; round < 2; round++) {
+        for (const model of models) {
+          try {
+            const response = await ai.models.generateContent({ model, contents: systemPrompt });
+            const reply = String(response.text || '').trim();
+            if (!reply) throw new Error('Gemini boş yanıt döndürdü.');
+            console.log(`AI Coach success provider=gemini model=${model} round=${round + 1} durationMs=${Date.now() - startedAt}`);
+            return res.json({ success: true, reply, model, provider: 'gemini', fallback: false });
+          } catch (err: any) {
+            lastError = err;
+            console.error(`AI Coach Gemini model=${model} round=${round + 1} failed${isGeminiQuotaError(err) ? ' (quota/billing)' : ''}:`, err?.message || err);
+            await new Promise((resolve) => setTimeout(resolve, 700));
+          }
+        }
+        if (round === 0) await new Promise((resolve) => setTimeout(resolve, 1600));
       }
       if (!hasOpenAI() && lastError) throw lastError;
     }
@@ -275,7 +288,7 @@ function localFoodAnalysisFallback(description = '', mealType = 'lunch') {
   ];
   const found = entries.find((entry) => entry.keys.some((key) => text.includes(key)));
   if (found) return { ...found, breakdown: [{ item: found.name, calories: found.calories, amount: '1 standart porsiyon' }], confidence: 'medium', analysisMode: 'local-description', note: 'Ücretsiz yerel analiz. Değerler yaklaşık olup porsiyona göre değişebilir.' };
-  return { name: text ? text.slice(0, 80) : 'Fotoğraftaki yemek', calories: 250, protein: 15, carbs: 28, fat: 9, fiber: 4, healthScore: 80, pros: ['Analiz sonucu güvenli varsayılan olarak oluşturuldu'], cons: ['Yemeğin türü ve porsiyonu doğrulanmadı'], advice: 'Gemini kotası kullanılamadığı için bu sonuç yaklaşık yerel tahmindir. Yemeğin adını veya porsiyonunu yazarak sonucu netleştirin.', breakdown: [{ item: 'Yaklaşık standart öğün', calories: 250, amount: '1 porsiyon' }], confidence: 'low', analysisMode: 'local-safe-default', note: 'Ücretsiz yerel güvenli varsayılan. Fotoğraf görsel olarak doğrulanamadığı için kesin besin değeri değildir.' };
+  return { name: text ? text.slice(0, 80) : 'Fotoğraftaki yemek', calories: 250, protein: 15, carbs: 28, fat: 9, fiber: 4, healthScore: 80, pros: ['Analiz sonucu güvenli varsayılan olarak oluşturuldu'], cons: ['Yemeğin türü ve porsiyonu doğrulanmadı'], advice: 'Gemini kotası kullanılamadığı için bu sonuç yaklaşık yerel tahmindir. Yemeğin adını veya porsiyonunu yazarak sonucu netleştirin.', breakdown: [{ item: 'Yaklaşık standart öğün', calories: 250, amount: '1 porsiyon' }], confidence: 'low', analysisMode: 'local-safe-default', note: 'Ücretsiz yerel güvenli varsayılan. Fotoğraf görsel olarak doğrulanmadığı için kesin besin değeri değildir.' };
 }
 
 function localCoachFallback(userProfile: any, todaySummary: any, userMessage: string) {
