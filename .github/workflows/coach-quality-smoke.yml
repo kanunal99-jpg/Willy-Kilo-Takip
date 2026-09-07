@@ -9,20 +9,29 @@ jobs:
   coach-quality-smoke:
     runs-on: ubuntu-latest
     steps:
-      - name: Wait for Render deployment
-        run: |
-          for i in {1..30}; do
-            code=$(curl -s -o /tmp/health.json -w '%{http_code}' https://willy-kilo-takip.onrender.com/api/health || true)
-            echo "health HTTP=$code"
-            cat /tmp/health.json || true
-            if [ "$code" = "200" ]; then exit 0; fi
-            sleep 10
-          done
-          echo 'Render health did not become ready in time'
-          exit 1
-
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Wait for exact Render deployment
+        env:
+          EXPECTED_COMMIT: ${{ github.sha }}
+          BASE_URL: https://willy-kilo-takip.onrender.com
+        run: |
+          set -euo pipefail
+          for i in {1..30}; do
+            code=$(curl -sS -o /tmp/health.json -w '%{http_code}' --max-time 20 "$BASE_URL/api/health" || true)
+            echo "health HTTP=$code"
+            cat /tmp/health.json || true
+            deployed=$(node -e "try { const j=require('/tmp/health.json'); process.stdout.write(String(j.deployCommit||'')); } catch (_) {}")
+            echo "expected=$EXPECTED_COMMIT deployed=$deployed"
+            if [ "$code" = "200" ] && [ "${deployed,,}" = "${EXPECTED_COMMIT,,}" ]; then
+              echo 'EXACT RENDER COMMIT READY'
+              exit 0
+            fi
+            sleep 10
+          done
+          echo 'Render did not become healthy on the exact GitHub commit in time'
+          exit 1
 
       - name: Run multi-intent real Gemini coach quality gate
         env:
