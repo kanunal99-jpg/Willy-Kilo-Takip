@@ -37,7 +37,6 @@
     "@capacitor/cli": "^7.4.3",
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.3",
-    "typescript": "~5.8.2",
-    "autoprefixer": "^10.4.3"
+    "typescript": "~5.8.2"
   }
 }
