@@ -22,8 +22,8 @@ const postReplacement = "app.post('/api/sync/:userId', (req, res) => {\n  const 
 if (!source.includes(postRoute)) throw new Error('sync POST route anchor not found');
 source = source.replace(postRoute, postReplacement);
 
-const healthAnchor = "app.get('/api/health', (req, res) => {\n  res.json({ status: 'ok', app: 'Willy Kilo Takip', aiEnabled: !!(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY), aiProviders: { gemini: !!process.env.GEMINI_API_KEY, openai: !!process.env.OPENAI_API_KEY }, timestamp: new Date().toISOString() });\n});";
-const healthReplacement = "app.get('/api/health', (req, res) => {\n  res.json({ status: 'ok', app: 'Willy Kilo Takip', aiEnabled: !!(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY), aiProviders: { gemini: !!process.env.GEMINI_API_KEY, openai: !!process.env.OPENAI_API_KEY }, syncPersistenceConfigured: SYNC_PERSISTENCE_CONFIGURED, timestamp: new Date().toISOString() });\n});";
+const healthAnchor = "app.get('/api/health', (req, res) => {\n  res.json({ status: 'ok', app: 'Willy Kilo Takip', aiEnabled: !!(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY), aiProviders: { gemini: !!process.env.GEMINI_API_KEY, openai: !!process.env.OPENAI_API_KEY }, deployCommit: process.env.RENDER_GIT_COMMIT || null, deployBranch: process.env.RENDER_GIT_BRANCH || null, timestamp: new Date().toISOString() });\n});";
+const healthReplacement = "app.get('/api/health', (req, res) => {\n  res.json({ status: 'ok', app: 'Willy Kilo Takip', aiEnabled: !!(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY), aiProviders: { gemini: !!process.env.GEMINI_API_KEY, openai: !!process.env.OPENAI_API_KEY }, syncPersistenceConfigured: SYNC_PERSISTENCE_CONFIGURED, deployCommit: process.env.RENDER_GIT_COMMIT || null, deployBranch: process.env.RENDER_GIT_BRANCH || null, timestamp: new Date().toISOString() });\n});";
 if (!source.includes(healthAnchor)) throw new Error('health anchor not found');
 source = source.replace(healthAnchor, healthReplacement);
 
