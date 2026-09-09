@@ -21,10 +21,11 @@ Yapay Zeka (Gemini) beslenme koçu ve fotoğraf tarama özelliklerini aktifleşt
 ```bash
 cp .env.example .env
 ```
-Ardından `.env` dosyasını açıp Google AI Studio API anahtarınızı ekleyin:
+Ardından Google AI Studio API anahtarınızı ekleyin:
 ```env
 GEMINI_API_KEY=your_gemini_api_key_here
 ```
+Ücretsiz Gemini üretim yolu için sunucuda ayrıca `USE_GEMINI_FREE_TIER=true` etkin olmalıdır.
 
 ### 4. Geliştirme Sunucusunu Başlatma
 ```bash
@@ -36,6 +37,9 @@ Sunucu başladığında tarayıcınızda şu adresi açın:
 ---
 
 ## 🚀 Üretim (Production) Derlemesi ve Çalıştırma
+
+Canlı üretim adresi:
+**`https://willy-kilo-takip.onrender.com`**
 
 Projeyi canlı sunucuda veya Docker/Cloud Run konteynerinde çalıştırmak için:
 
@@ -58,8 +62,8 @@ Android Studio kurmadan doğrudan terminal üzerinden imzalı `.apk` dosyası ü
 # 1. Bubblewrap CLI aracını küresel olarak yükleyin:
 npm install -g @bubblewrap/cli
 
-# 2. Canlı uygulamanızın manifest dosyasıyla projeyi oluşturun:
-bubblewrap init --manifest="https://ais-dev-dvnvts6sqeqpm2rx53m2ma-627591680405.europe-west2.run.app/manifest.webmanifest"
+# 2. Canlı uygulamanın manifest dosyasıyla projeyi oluşturun:
+bubblewrap init --manifest="https://willy-kilo-takip.onrender.com/manifest.webmanifest"
 
 # 3. İmzalı APK'yı derleyin:
 bubblewrap build
