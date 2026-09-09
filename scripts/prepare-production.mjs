@@ -34,10 +34,9 @@ if (!server.includes('function isGeminiQuotaExhaustedError')) {
   server = server.replace(helperMarker, quotaHelper + helperMarker);
 }
 
-// Keep a genuinely free Gemini model in the production rotation. Gemini 3.x can be quota/billing limited;
-// Gemini 3.5 Flash-Lite currently has a free Standard tier and is suitable for short coach replies.
+// Prefer the currently documented free-tier Gemini model first. If it is unavailable, keep the existing 3.x rotation.
 const legacyCoachModels = "const models = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash'];";
-const hardenedCoachModels = "const models = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite'];";
+const hardenedCoachModels = "const models = ['gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite'];";
 if (server.includes(legacyCoachModels)) {
   server = server.replace(legacyCoachModels, hardenedCoachModels);
 } else if (!server.includes(hardenedCoachModels)) {
@@ -45,7 +44,7 @@ if (server.includes(legacyCoachModels)) {
 }
 
 const oldAiLine = "const response = await ai.models.generateContent({ model: 'gemini-3.6-flash', contents, config: { responseMimeType: 'application/json' } });";
-const newAiBlock = `const models = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-3.5-flash-lite'];
+const newAiBlock = `const models = ['gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite'];
     let response: any = null;
     let lastError: any = null;
     const rawImage = String(imageBase64 || '');
@@ -73,7 +72,7 @@ const newAiBlock = `const models = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gem
 
 if (server.includes(oldAiLine)) {
   server = server.replace(oldAiLine, newAiBlock);
-} else if (!server.includes("const models = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-3.5-flash-lite'];")) {
+} else if (!server.includes("const models = ['gemini-2.5-flash', 'gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite'];")) {
   throw new Error('AI food generateContent target not found; refusing unsafe patch');
 }
 
@@ -95,4 +94,4 @@ if (server.includes(coachFinalNeedle)) {
 }
 
 fs.writeFileSync(serverPath, server);
-console.log('Production AI patch PASS: native API base + image MIME + Gemini fallback + quota-safe local fallback applied.');
+console.log('Production AI patch PASS: native API base + image MIME + free Gemini 2.5-first rotation + quota-safe local fallback applied.');
