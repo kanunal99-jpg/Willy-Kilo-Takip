@@ -213,10 +213,14 @@ jobs:
           cp android/app/build/outputs/apk/release/app-release.apk release-assets/WillyKiloTakip-v${{ steps.version-contract.outputs.VERSION }}.apk
           rm -f android/willy-release.jks
 
+      - name: Verify APK aliases and SHA-256 before release
+        shell: bash
+        run: bash scripts/verify-release-assets.sh release-assets
+
       - uses: actions/upload-artifact@v4
         with:
           name: willy-kilo-takip-apk
-          path: release-assets/WillyKiloTakip.apk
+          path: release-assets/
           if-no-files-found: error
 
       - name: Create GitHub Release LAST
@@ -233,6 +237,7 @@ jobs:
           files: |
             release-assets/WillyKiloTakip.apk
             release-assets/WillyKiloTakip-v${{ steps.version-contract.outputs.VERSION }}.apk
+            release-assets/SHA256SUMS.txt
           draft: false
           prerelease: false
           fail_on_unmatched_files: true
