@@ -1,0 +1,34 @@
+name: APK Release Integrity PR
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-checksum-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check verification script syntax
+        run: bash -n scripts/verify-release-assets.sh
+      - name: Verify checksum generation and tamper detection
+        shell: bash
+        run: |
+          set -euo pipefail
+          fixture="$(mktemp -d)"
+          trap 'rm -rf "$fixture"' EXIT
+          printf 'synthetic APK bytes for testing checksum behavior\n' > "$fixture/WillyKiloTakip.apk"
+          cp "$fixture/WillyKiloTakip.apk" "$fixture/WillyKiloTakip-v1.0.0.apk"
+          bash scripts/verify-release-assets.sh "$fixture"
+          grep -q 'WillyKiloTakip.apk' "$fixture/SHA256SUMS.txt"
+          grep -q 'WillyKiloTakip-v1.0.0.apk' "$fixture/SHA256SUMS.txt"
+          printf 'tamper' >> "$fixture/WillyKiloTakip.apk"
+          if (cd "$fixture" && sha256sum -c SHA256SUMS.txt); then
+            echo 'ERROR: modified APK passed checksum verification' >&2
+            exit 1
+          fi
+          echo 'Tampered APK correctly rejected'
