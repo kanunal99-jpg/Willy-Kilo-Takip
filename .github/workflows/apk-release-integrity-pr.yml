@@ -13,6 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Check AI gate pending, failure, and success handling
+        run: python3 -m unittest discover -s tests -p 'test_upstream_quality_gates.py'
       - name: Check verification script syntax
         run: bash -n scripts/verify-release-assets.sh
       - name: Verify checksum generation and tamper detection
