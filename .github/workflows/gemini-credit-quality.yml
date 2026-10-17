@@ -20,7 +20,7 @@ jobs:
       - name: Install dependencies
         run: npm install
       - name: Test permanent billing vs transient retry policy
-        run: node --test tests/gemini-retry-policy.test.mjs
+        run: node --test tests/gemini-retry-policy.test.mjs tests/gemini-billing-circuit.test.mjs
       - name: Typecheck
         run: npm run lint
       - name: Verify production build (without external AI requests)
