@@ -159,7 +159,7 @@ function parseAiJson(text: string): any {
 }
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', app: 'Willy Kilo Takip', aiEnabled: !!(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY), aiProviders: { gemini: !!process.env.GEMINI_API_KEY, openai: !!process.env.OPENAI_API_KEY }, deployCommit: process.env.RENDER_GIT_COMMIT || null, deployBranch: process.env.RENDER_GIT_BRANCH || null, timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', app: 'Willy Kilo Takip', aiEnabled: !!(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY), aiProviders: { gemini: !!process.env.GEMINI_API_KEY, openai: !!process.env.OPENAI_API_KEY }, geminiBillingCooldownSeconds: Math.ceil(geminiCreditCircuit.remainingMs() / 1000), geminiProviderStatus: geminiCreditCircuit.isOpen() ? 'billing_cooldown' : (process.env.GEMINI_API_KEY ? 'configured_unverified' : 'not_configured'), deployCommit: process.env.RENDER_GIT_COMMIT || null, deployBranch: process.env.RENDER_GIT_BRANCH || null, timestamp: new Date().toISOString() });
 });
 
 const VERSION_FILE = path.join(process.cwd(), 'version.json');
