@@ -1,5 +1,5 @@
 import express from 'express';
-import { isNonRetryableGeminiCreditError } from './scripts/gemini-retry-policy.mjs';
+import { createGeminiCreditCircuit } from './scripts/gemini-retry-policy.mjs';
 import path from 'path';
 import fs from 'fs';
 import { GoogleGenAI } from '@google/genai';
@@ -103,10 +103,13 @@ function requireSyncKey(req: express.Request, res: express.Response): string | n
   return key;
 }
 
+const geminiCreditCircuit = createGeminiCreditCircuit();
 let aiClient: GoogleGenAI | null = null;
 function getGemini(): GoogleGenAI | null {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) return null;
+  // A billing denial affects every model on this API account.
+  if (geminiCreditCircuit.isOpen()) return null;
   if (!aiClient) aiClient = new GoogleGenAI({ apiKey });
   return aiClient;
 }
@@ -156,7 +159,7 @@ function parseAiJson(text: string): any {
 }
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', app: 'Willy Kilo Takip', aiEnabled: !!(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY), aiProviders: { gemini: !!process.env.GEMINI_API_KEY, openai: !!process.env.OPENAI_API_KEY }, deployCommit: process.env.RENDER_GIT_COMMIT || null, deployBranch: process.env.RENDER_GIT_BRANCH || null, timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', app: 'Willy Kilo Takip', aiEnabled: !!(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY), aiProviders: { gemini: !!process.env.GEMINI_API_KEY, openai: !!process.env.OPENAI_API_KEY }, geminiBillingCooldownSeconds: Math.ceil(geminiCreditCircuit.remainingMs() / 1000), geminiProviderStatus: geminiCreditCircuit.isOpen() ? 'billing_cooldown' : (process.env.GEMINI_API_KEY ? 'configured_unverified' : 'not_configured'), deployCommit: process.env.RENDER_GIT_COMMIT || null, deployBranch: process.env.RENDER_GIT_BRANCH || null, timestamp: new Date().toISOString() });
 });
 
 const VERSION_FILE = path.join(process.cwd(), 'version.json');
@@ -230,8 +233,12 @@ app.post('/api/ai/analyze-food', async (req, res) => {
         contents.push(promptText);
         const response = await ai.models.generateContent({ model: 'gemini-3.6-flash', contents, config: { responseMimeType: 'application/json' } });
         const data = parseAiJson(response.text || '{}');
+        geminiCreditCircuit.recordSuccess();
         return res.json({ success: true, data, provider: 'gemini', model: 'gemini-3.6-flash', fallback: false, analysisMode: 'cloud-ai', visualAnalyzed: Boolean(imageBase64) });
-      } catch (err: any) { console.error('AI Food Gemini failed' + (isGeminiQuotaError(err) ? ' (quota/billing)' : '') + ':', err?.message || err); }
+      } catch (err: any) {
+        if (geminiCreditCircuit.recordFailure(err)) console.warn('Gemini food requests on billing cooldown; local analysis enabled.');
+        console.error('AI Food Gemini failed' + (isGeminiQuotaError(err) ? ' (quota/billing)' : '') + ':', err?.message || err);
+      }
     }
     const fallback = localFoodAnalysisFallback(safeDescription, mealType);
     return res.status(200).json({ success: true, data: fallback, provider: 'local', model: 'local-safe-food-fallback-v1', fallback: true, analysisMode: fallback.analysisMode, visualAnalyzed: false, warning: 'Fotoğraf görsel olarak doğrulanamadı; sonuç metin/porsiyon bilgisi yoksa yaklaşık tahmindir.' });
@@ -256,11 +263,12 @@ app.post('/api/ai/coach', async (req, res) => {
             const reply = String(response.text || '').trim();
             if (!reply) throw new Error('Gemini boş yanıt döndürdü.');
             console.log(`AI Coach success provider=gemini model=${model} round=${round + 1} durationMs=${Date.now() - startedAt}`);
+            geminiCreditCircuit.recordSuccess();
             return res.json({ success: true, reply, model, provider: 'gemini', fallback: false });
           } catch (err: any) {
             lastError = err;
             console.error(`AI Coach Gemini model=${model} round=${round + 1} failed${isGeminiQuotaError(err) ? ' (quota/billing)' : ''}:`, err?.message || err);
-            if (isNonRetryableGeminiCreditError(err)) {
+            if (geminiCreditCircuit.recordFailure(err)) {
               creditBalanceDepleted = true;
               console.warn('Gemini prepayment balance depleted: skipping all remaining Gemini retries.');
               break;

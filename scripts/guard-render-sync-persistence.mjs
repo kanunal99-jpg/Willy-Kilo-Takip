@@ -22,10 +22,19 @@ const postReplacement = "app.post('/api/sync/:userId', (req, res) => {\n  const 
 if (!source.includes(postRoute)) throw new Error('sync POST route anchor not found');
 source = source.replace(postRoute, postReplacement);
 
-const healthAnchor = "app.get('/api/health', (req, res) => {\n  res.json({ status: 'ok', app: 'Willy Kilo Takip', aiEnabled: !!(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY), aiProviders: { gemini: !!process.env.GEMINI_API_KEY, openai: !!process.env.OPENAI_API_KEY }, deployCommit: process.env.RENDER_GIT_COMMIT || null, deployBranch: process.env.RENDER_GIT_BRANCH || null, timestamp: new Date().toISOString() });\n});";
-const healthReplacement = "app.get('/api/health', (req, res) => {\n  res.json({ status: 'ok', app: 'Willy Kilo Takip', aiEnabled: !!(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY), aiProviders: { gemini: !!process.env.GEMINI_API_KEY, openai: !!process.env.OPENAI_API_KEY }, syncPersistenceConfigured: SYNC_PERSISTENCE_CONFIGURED, deployCommit: process.env.RENDER_GIT_COMMIT || null, deployBranch: process.env.RENDER_GIT_BRANCH || null, timestamp: new Date().toISOString() });\n});";
-if (!source.includes(healthAnchor)) throw new Error('health anchor not found');
-source = source.replace(healthAnchor, healthReplacement);
+// Append only the missing sync field; preserve unrelated health/AI status keys.
+const healthStart = source.indexOf("app.get('/api/health', (req, res) => {");
+const healthEnd = source.indexOf("\n});", healthStart);
+if (healthStart === -1 || healthEnd === -1) throw new Error('health route not found');
+const healthRoute = source.slice(healthStart, healthEnd);
+const commitField = "deployCommit: process.env.RENDER_GIT_COMMIT || null";
+if (!healthRoute.includes(commitField)) throw new Error('health deployCommit field not found');
+if (healthRoute.includes('syncPersistenceConfigured:')) throw new Error('health sync status already patched unexpectedly');
+const updatedHealthRoute = healthRoute.replace(
+  commitField,
+  'syncPersistenceConfigured: SYNC_PERSISTENCE_CONFIGURED, ' + commitField
+);
+source = source.slice(0, healthStart) + updatedHealthRoute + source.slice(healthEnd);
 
 fs.writeFileSync(file, source, 'utf8');
 console.log('Render sync persistence guard applied.');
