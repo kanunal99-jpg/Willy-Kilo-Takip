@@ -1,4 +1,5 @@
 import express from 'express';
+import { isNonRetryableGeminiCreditError } from './scripts/gemini-retry-policy.mjs';
 import path from 'path';
 import fs from 'fs';
 import { GoogleGenAI } from '@google/genai';
@@ -245,6 +246,7 @@ app.post('/api/ai/coach', async (req, res) => {
     if (!safeMessage) return res.status(400).json({ success: false, error: 'Mesaj boş olamaz.', code: 'INVALID_AI_MESSAGE' });
     const systemPrompt = `Sen Willy Kilo Takip uygulamasının kişisel beslenme koçusun. Türkçe, pratik ve sürdürülebilir öneriler ver. Tıbbi tanı koyma ve kesin/garantili sağlık sonucu iddia etme. Kullanıcı profilini ve bugünün özetini yalnızca mevcut soruyla doğrudan ilgili olduğunda kullan; soruyla ilgisiz günlük metrikleri cevaba taşıma. Nedensel sağlık iddialarını kesin dille kurma; belirsizlik varsa açıkça belirt. Kullanıcıya uygulanabilir porsiyon, alışkanlık ve takip önerileri sun. Profil: ${JSON.stringify(userProfile || {})}. Bugün: ${JSON.stringify(todaySummary || {})}. Kullanıcı sorusu: ${JSON.stringify(safeMessage)}`;
     const ai = getGemini(); let lastError: any = null;
+    let creditBalanceDepleted = false;
     if (ai) {
       const models = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash'];
       for (let round = 0; round < 2; round++) {
@@ -258,9 +260,15 @@ app.post('/api/ai/coach', async (req, res) => {
           } catch (err: any) {
             lastError = err;
             console.error(`AI Coach Gemini model=${model} round=${round + 1} failed${isGeminiQuotaError(err) ? ' (quota/billing)' : ''}:`, err?.message || err);
+            if (isNonRetryableGeminiCreditError(err)) {
+              creditBalanceDepleted = true;
+              console.warn('Gemini prepayment balance depleted: skipping all remaining Gemini retries.');
+              break;
+            }
             await new Promise((resolve) => setTimeout(resolve, 700));
           }
         }
+        if (creditBalanceDepleted) break;
         if (round === 0) await new Promise((resolve) => setTimeout(resolve, 1600));
       }
       if (!hasOpenAI() && lastError) throw lastError;

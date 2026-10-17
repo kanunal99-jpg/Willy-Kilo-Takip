@@ -1,0 +1,27 @@
+name: Gemini Credit Fallback Quality
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  retry-policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        run: npm install
+      - name: Test permanent billing vs transient retry policy
+        run: node --test tests/gemini-retry-policy.test.mjs
+      - name: Typecheck
+        run: npm run lint
+      - name: Verify production build (without external AI requests)
+        run: npm run build
