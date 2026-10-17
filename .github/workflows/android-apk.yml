@@ -72,28 +72,9 @@ jobs:
           echo "Waiting for Production AI Smoke + Coach Quality checks on $EXPECTED_COMMIT"
           for i in {1..30}; do
             checks=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${EXPECTED_COMMIT}/check-runs?per_page=100")
-            CHECKS="$checks" EXPECTED_COMMIT="$EXPECTED_COMMIT" python3 - <<'PY'
-          import json, os, sys
-          d=json.loads(os.environ['CHECKS'])
-          expected=os.environ['EXPECTED_COMMIT']
-          runs=d.get('check_runs', [])
-          wanted={
-              'production-ai-smoke': None,
-              'coach-quality-smoke': None,
-          }
-          for r in runs:
-              name=r.get('name','')
-              if name in wanted:
-                  wanted[name]=(r.get('status'),r.get('conclusion'),r.get('head_sha'))
-          print(json.dumps(wanted))
-          for name, value in wanted.items():
-              if value is None or value[2] != expected or value[0] != 'completed':
-                  sys.exit(10)
-              if value[1] != 'success':
-                  raise SystemExit(f'{name} failed: {value}')
-          print('UPSTREAM AI QUALITY GATES PASS')
-          PY
-            rc=$?
+            # An in-progress check exits 10; capture it without triggering set -e.
+            rc=0
+            CHECKS="$checks" EXPECTED_COMMIT="$EXPECTED_COMMIT" python3 scripts/verify_upstream_quality_gates.py || rc=$?
             if [ "$rc" = "0" ]; then exit 0; fi
             if [ "$rc" != "10" ]; then exit "$rc"; fi
             sleep 10
